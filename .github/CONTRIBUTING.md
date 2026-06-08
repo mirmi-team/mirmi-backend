@@ -53,3 +53,9 @@ PR 생성 전 확인 사항
 
 Closes #12
 
+---
+
+## PR 커밋
+
+기능 구현 끝난 브랜치 닫기 전 마지막에 PR커밋메세지 작성할 때 규칙
+- Merge pull request #{pr번호(연한글씨)} from mirmi-team/{브랜치 이름}
