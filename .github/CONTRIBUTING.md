@@ -1,15 +1,15 @@
 ## Branch Naming
 ```
-feature/{name} 
-fix/{name}
-refactor/{name}
-docs/{name}
-chore/{name}
+feature/이슈번호-{name} 
+fix/이슈번호-{name}
+refactor/이슈번호-{name}
+docs/이슈번호-{name}
+chore/이슈번호-{name}
 ```
 예시:
-- feature/login
-- fix/api-error
-- chore/github-template
+- feature/2-login
+- fix/24-api-error
+- chore/19-github-template
 
 ---
 
