@@ -58,4 +58,5 @@ Closes #12
 ## PR 커밋
 
 기능 구현 끝난 브랜치 닫기 전 마지막에 PR커밋메세지 작성할 때 규칙
-- Merge pull request #{pr번호(연한글씨)} from mirmi-team/{브랜치 이름}
+- 제목: Merge pull request #{pr번호(연한글씨)} from mirmi-team/{브랜치 이름}
+- 부가 내용: PR제목과 똑같이 ex) [#1] Flutter 초기 프로젝트 구조 및 라우터 설정
