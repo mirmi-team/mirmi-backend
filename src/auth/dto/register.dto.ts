@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsInt } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsInt, IsBoolean } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -11,6 +11,15 @@ export class RegisterDto {
   @IsString()
   username: string;
 
+  @IsBoolean()
+  can_staying: boolean;
+
   @IsInt()
-  room_id: number;
+  room_number: number;
+
+  @IsInt()
+  grade: number;
+
+  @IsInt()
+  class_no: number;
 }

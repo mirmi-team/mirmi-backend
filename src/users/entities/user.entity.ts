@@ -1,4 +1,5 @@
 // src/users/entities/user.entity.ts
+import { Room } from 'src/rooms/entities/room.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -7,7 +8,6 @@ import {
   JoinColumn,
   CreateDateColumn,
 } from 'typeorm';
-// import { Room } from '../../rooms/entities/room.entity';
 
 export enum UserRole {
   STUDENT = 'STUDENT',
@@ -47,8 +47,13 @@ export class User {
   @CreateDateColumn()
   created_at: Date;
 
-  // 관계 설정: 여러 user가 하나의 room에 속함
-  //   @ManyToOne(() => Room)
-  //   @JoinColumn({ name: 'room_id' })
-  //   room: Room;
+  @Column()
+  grade: number;
+
+  @Column()
+  class_no: number;
+
+  @ManyToOne(() => Room)
+  @JoinColumn({ name: 'room_id' })
+  room: Room;
 }
