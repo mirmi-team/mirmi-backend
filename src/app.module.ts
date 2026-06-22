@@ -14,6 +14,7 @@ import { MeritLogsModule } from './merit-logs/merit-logs.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RoomsModule } from './rooms/rooms.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     StayStatusModule,
     MeritLogsModule,
     ScheduleModule,
+    RoomsModule,
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'postgres',
