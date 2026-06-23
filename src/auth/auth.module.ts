@@ -6,9 +6,13 @@ import { User } from 'src/users/entities/user.entity';
 import { Room } from 'src/rooms/entities/room.entity';
 import { EmailVerification } from './entities/email-verification.entity';
 import { MailService } from './mail.service';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Room, EmailVerification])],
+  imports: [
+    TypeOrmModule.forFeature([User, Room, EmailVerification]),
+    JwtModule.register({}),
+  ],
   controllers: [AuthController],
   providers: [AuthService, MailService],
 })

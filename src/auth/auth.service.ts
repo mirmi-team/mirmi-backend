@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +13,8 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { EmailVerification } from './entities/email-verification.entity';
 import { MailService } from './mail.service';
+import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +26,7 @@ export class AuthService {
     @InjectRepository(EmailVerification)
     private emailVerificationRepository: Repository<EmailVerification>,
     private mailService: MailService,
+    private jwtService: JwtService,
   ) {}
 
   async sendVerificationCode(email: string) {
@@ -112,5 +116,34 @@ export class AuthService {
 
     const { password, ...result } = saved;
     return result;
+  }
+  async login(email: string, password: string) {
+    // 1. 이메일로 사용자 찾기
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    // 2. 비밀번호 비교
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    // 3. 토큰 발급
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const accessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: '1h',
+    });
+
+    return {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+      },
+    };
   }
 }
