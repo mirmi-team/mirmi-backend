@@ -15,6 +15,7 @@ import { EmailVerification } from './entities/email-verification.entity';
 import { MailService } from './mail.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
+import { RefreshToken } from './entities/refresh-token.entity';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +26,8 @@ export class AuthService {
     private roomRepository: Repository<Room>,
     @InjectRepository(EmailVerification)
     private emailVerificationRepository: Repository<EmailVerification>,
+    @InjectRepository(RefreshToken)
+    private refreshTokenRepository: Repository<RefreshToken>,
     private mailService: MailService,
     private jwtService: JwtService,
   ) {}
@@ -117,33 +120,100 @@ export class AuthService {
     const { password, ...result } = saved;
     return result;
   }
+
   async login(email: string, password: string) {
     // 1. 이메일로 사용자 찾기
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException(
+        '이메일 또는 비밀번호가 올바르지 않습니다.',
+      );
     }
 
     // 2. 비밀번호 비교
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException(
+        '이메일 또는 비밀번호가 올바르지 않습니다.',
+      );
     }
 
     // 3. 토큰 발급
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwtService.sign(payload, {
+      // accessToken 발급
       secret: process.env.JWT_ACCESS_SECRET,
-      expiresIn: '1h',
+      expiresIn: '1h', // 1시간
     });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      // refreshToken 발급
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '14d', // 2주
+    });
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 14); // refreshToken DB에 넣을 만료 기간 설정 (현재날짜 + 14일)
+
+    await this.refreshTokenRepository.delete({ user_id: user.id }); // user의 refresh_token DB 비우기
+
+    const tokenEntity = this.refreshTokenRepository.create({
+      // refresh_token DB에 정보 저장
+      user_id: user.id,
+      token_hash: hashedRefreshToken,
+      expires_at: expiresAt,
+    });
+
+    await this.refreshTokenRepository.save(tokenEntity);
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
         username: user.username,
       },
     };
+  }
+
+  // 새 accessToken 발급
+  async refresh(refreshToken: string) {
+    // 1. refreshToken 유효성 검사
+    let payload: any;
+
+    // 받은 refreshToken을 검증하면서 검증되면 정보는 payload에 저장되고 검증이 실패하면 exception 처리
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+    } catch {
+      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+    }
+
+    // 2. DB에 연결된 토큰과 대조
+    const stored = await this.refreshTokenRepository.findOne({
+      where: { user_id: payload.sub },
+    });
+    if (!stored) throw new UnauthorizedException('로그인이 필요합니다.');
+
+    const isMatch = await bcrypt.compare(refreshToken, stored.token_hash);
+    if (!isMatch) {
+      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+    }
+
+    // 3. 새 AccessToken 발급
+    const newPayload = {
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    };
+    const accessToken = this.jwtService.sign(newPayload, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: '1h',
+    });
+
+    return { accessToken };
   }
 }

@@ -9,10 +9,11 @@ import { MailService } from './mail.service';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { RefreshToken } from './entities/refresh-token.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Room, EmailVerification]),
+    TypeOrmModule.forFeature([User, Room, EmailVerification, RefreshToken]),
     JwtModule.register({}),
     PassportModule,
   ],
