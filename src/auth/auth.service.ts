@@ -216,4 +216,9 @@ export class AuthService {
 
     return { accessToken };
   }
+
+  async logout(userId: number) {
+    await this.refreshTokenRepository.delete({ user_id: userId });
+    return { message: '로그아웃 되었습니다.' };
+  }
 }
