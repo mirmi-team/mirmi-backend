@@ -169,6 +169,7 @@ export class AuthService {
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -177,10 +178,12 @@ export class AuthService {
     };
   }
 
+  // 새 accessToken 발급
   async refresh(refreshToken: string) {
     // 1. refreshToken 유효성 검사
     let payload: any;
 
+    // 받은 refreshToken을 검증하면서 검증되면 정보는 payload에 저장되고 검증이 실패하면 exception 처리
     try {
       payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
@@ -190,8 +193,27 @@ export class AuthService {
     }
 
     // 2. DB에 연결된 토큰과 대조
-    
+    const stored = await this.refreshTokenRepository.findOne({
+      where: { user_id: payload.sub },
+    });
+    if (!stored) throw new UnauthorizedException('로그인이 필요합니다.');
 
+    const isMatch = await bcrypt.compare(refreshToken, stored.token_hash);
+    if (!isMatch) {
+      throw new UnauthorizedException('유효하지 않은 토큰입니다.');
+    }
 
+    // 3. 새 AccessToken 발급
+    const newPayload = {
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    };
+    const accessToken = this.jwtService.sign(newPayload, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: '1h',
+    });
+
+    return { accessToken };
   }
 }

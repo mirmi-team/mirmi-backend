@@ -8,7 +8,7 @@ export class RefreshToken {
   @Column()
   user_id: number;
 
-  @Column()
+  @Column({ type: 'varchar', length: 60 }) //
   token_hash: string;
 
   @Column()
