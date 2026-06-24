@@ -33,6 +33,12 @@ export class AuthService {
   ) {}
 
   async sendVerificationCode(email: string) {
+    const exists = await this.userRepository.findOne({ where: { email } });
+
+    if (exists) {
+      throw new ConflictException('이미 가입된 이메일입니다.');
+    }
+
     // 6자리 랜덤 코드 생성
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -81,7 +87,7 @@ export class AuthService {
     return { message: '이메일 인증이 완료되었습니다.' };
   }
 
-  // 이메일 인증
+  // 회원가입
   async register(dto: RegisterDto) {
     const verification = await this.emailVerificationRepository.findOne({
       where: { email: dto.email },
