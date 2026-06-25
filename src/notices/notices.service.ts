@@ -49,6 +49,17 @@ export class NoticesService {
     }
 
     Object.assign(notice, dto); // dto에 있는 파일만 notice에 덮어씀
-    return await this.noticeRepository.save(notice);
+    await this.noticeRepository.save(notice);
+    return { message: '공지사항이 수정되었습니다.' };
+  }
+
+  async delete(id: number) {
+    const notice = await this.noticeRepository.findOne({ where: { id } });
+    if (!notice) {
+      throw new NotFoundException('공지사항을 찾을 수 없습니다.');
+    }
+    await this.noticeRepository.delete(id);
+
+    return { message: '공지사항이 삭제되었습니다.' };
   }
 }

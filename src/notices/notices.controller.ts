@@ -40,4 +40,13 @@ export class NoticesController {
   update(@Param('id') id: string, @Body() dto: UpdateNoticeDto) {
     return this.noticesService.update(+id, dto);
   }
+
+  //삭제 - 관리자만
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard) // 토큰 검증 -> 권한 검증
+  @Roles('ADMIN')
+  delete(@Param('id') id: string) {
+    return this.noticesService.delete(+id);
+  }
+
 }
