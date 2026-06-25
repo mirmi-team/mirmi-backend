@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) {} // reflector로 decorator에서 붙여둔 메타데이터 읽기
 
   canActivate(context: ExecutionContext): boolean {
     // 이 라우트에 필요한 역할 읽기 (@Roles로 붙인 값)
