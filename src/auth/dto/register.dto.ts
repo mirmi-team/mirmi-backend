@@ -1,4 +1,12 @@
-import { IsEmail, IsString, MinLength, IsInt, IsBoolean } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsInt,
+  IsBoolean,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -18,8 +26,12 @@ export class RegisterDto {
   room_number: number;
 
   @IsInt()
+  @Min(1)
+  @Max(3)
   grade: number;
 
   @IsInt()
+  @Min(1)
+  @Max(6)
   class_no: number;
 }

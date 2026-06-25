@@ -13,7 +13,7 @@ export class NoticesService {
   ) {}
 
   async findOne() {
-    // 오늘 공지사항 조회
+    // 오늘 공지사항 최근 1개 조회
     // 오늘 00:00:00
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -24,6 +24,31 @@ export class NoticesService {
 
     // 오늘 범위에 등록된 공지 찾기 (최신 1개)
     const notice = await this.noticeRepository.findOne({
+      where: {
+        created_at: Between(startOfDay, endOfDay),
+      },
+      order: { created_at: 'DESC' },
+    });
+
+    if (!notice) {
+      return { message: '아직 오늘 공지사항이 올라오지 않았습니다.' };
+    }
+
+    return notice;
+  }
+
+  async findAll() {
+    // 오늘 공지사항 전체 조회
+    // 오늘 00:00:00
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    // 내일 00:00:00 (오늘의 끝)
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    // 오늘 범위에 등록된 공지 찾기 (최신 1개)
+    const notice = await this.noticeRepository.find({
       where: {
         created_at: Between(startOfDay, endOfDay),
       },

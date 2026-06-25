@@ -25,6 +25,11 @@ export class NoticesController {
     return this.noticesService.findOne();
   }
 
+  @Get('findAll')
+  findAll() {
+    return this.noticesService.findAll();
+  }
+
   //등록 - 관리자만
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard) // 토큰 검증 -> 권한 검증
