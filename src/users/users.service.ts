@@ -45,4 +45,20 @@ export class UsersService {
 
     return { message: '비밀번호가 변경되었습니다.' };
   }
+
+  async updateProfileImage(userId: number, filename: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    // DB엔 경로만 저장
+    user.profile_image = `uploads/profile/${filename}`;
+    await this.userRepository.save(user);
+
+    return {
+      message: '프로필 사진이 변경되었습니다.',
+      profile_image: user.profile_image,
+    };
+  }
 }
