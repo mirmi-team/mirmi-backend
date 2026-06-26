@@ -13,7 +13,6 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { EmailVerification } from './entities/email-verification.entity';
 import { MailService } from './mail.service';
-import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { RefreshToken } from './entities/refresh-token.entity';
 
@@ -33,6 +32,19 @@ export class AuthService {
   ) {}
 
   async sendVerificationCode(email: string) {
+    const match = email.match(/^s(\d{2})\d+@e-mirim\.hs\.kr$/);
+    if (!match) {
+      throw new BadRequestException('올바른 학교 이메일이 아닙니다.');
+    }
+
+    const admissionYear = 2000 + parseInt(match[1]); // 25 -> 2025
+    const currentYear = new Date().getFullYear(); // 2026
+
+    // 재학생 : 올해 ~ 올해-2 입학 (올해가 2026년이니 26, 25, 24까지 재학생)
+    if (admissionYear < currentYear - 2 || admissionYear > currentYear) {
+      throw new BadRequestException('재학생만 가입할 수 있습니다.');
+    }
+
     const exists = await this.userRepository.findOne({ where: { email } });
 
     if (exists) {
