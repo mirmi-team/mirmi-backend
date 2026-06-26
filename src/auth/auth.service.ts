@@ -15,7 +15,6 @@ import { EmailVerification } from './entities/email-verification.entity';
 import { MailService } from './mail.service';
 import { JwtService } from '@nestjs/jwt';
 import { RefreshToken } from './entities/refresh-token.entity';
-import { parse } from 'path';
 
 @Injectable()
 export class AuthService {
