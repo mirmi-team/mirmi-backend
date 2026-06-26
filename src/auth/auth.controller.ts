@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { SendEmailDto } from './dto/send-email.dto';
@@ -41,4 +41,6 @@ export class AuthController {
   logout(@GetUser() user) {
     return this.authService.logout(user.id);
   }
+
+  
 }
