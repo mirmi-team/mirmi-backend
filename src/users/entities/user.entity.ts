@@ -53,6 +53,9 @@ export class User {
   @Column()
   class_no: number;
 
+  @Column({ nullable: true })
+  profile_image: string;
+
   @ManyToOne(() => Room)
   @JoinColumn({ name: 'room_id' })
   room: Room;
