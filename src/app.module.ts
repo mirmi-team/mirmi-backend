@@ -40,6 +40,7 @@ import { RoomsModule } from './rooms/rooms.module';
       database: process.env.DB_NAME,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: false,
+      ssl: { rejectUnauthorized: false },
     }),
   ],
   controllers: [AppController],
