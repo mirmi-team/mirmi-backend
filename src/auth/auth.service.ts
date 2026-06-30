@@ -111,13 +111,10 @@ export class AuthService {
     if (!verification || !verification.is_verified) {
       throw new BadRequestException('이메일 인증을 먼저 완료해주세요.');
     }
-
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
     const exists = await this.userRepository.findOne({
       where: { email: dto.email },
     });
-    if (exists) {
-      throw new ConflictException('이미 가입된 이메일입니다.');
-    }
 
     const room = await this.roomRepository.findOne({
       where: { room_number: dto.room_number },
@@ -126,7 +123,24 @@ export class AuthService {
       throw new NotFoundException('존재하지 않는 방 번호입니다.');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    if (exists) {
+      if (exists.role !== UserRole.ADMIN) {
+        throw new ConflictException('이미 가입된 이메일입니다.');
+      }
+      // ADMIN이면 기존 정보 업데이트
+
+      exists.username = dto.username;
+      exists.room_id = room.id;
+      exists.grade = dto.grade;
+      exists.class_no = dto.class_no;
+      exists.can_staying = dto.can_staying;
+      exists.password = hashedPassword;
+
+      const saved = await this.userRepository.save(exists);
+
+      const { password, ...result } = saved;
+      return result;
+    }
 
     const user = this.userRepository.create({
       email: dto.email,
