@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { User } from 'src/users/entities/user.entity';
+import { User, UserRole } from 'src/users/entities/user.entity';
 import { Room } from 'src/rooms/entities/room.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -32,23 +32,27 @@ export class AuthService {
   ) {}
 
   async sendVerificationCode(email: string) {
-    const match = email.match(/^[sd](\d{2})\d{2}@e-mirim\.hs\.kr$/); // 형식을 강제하며 s2531의 25만 추출
-    if (!match) {
-      throw new BadRequestException('올바른 학교 이메일이 아닙니다.');
-    }
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
 
-    const admissionYear = 2000 + parseInt(match[1]); // 25 -> 2025
-    const currentYear = new Date().getFullYear(); // 2026
-
-    // 재학생 : 올해 ~ 올해-2 입학 (올해가 2026년이니 26, 25, 24까지 재학생)
-    if (admissionYear < currentYear - 2 || admissionYear > currentYear) {
-      throw new BadRequestException('재학생만 가입할 수 있습니다.');
-    }
-
-    const exists = await this.userRepository.findOne({ where: { email } });
-
-    if (exists) {
+    if (existingUser && existingUser.role !== UserRole.ADMIN) {
       throw new ConflictException('이미 가입된 이메일입니다.');
+    }
+
+    if (!existingUser) {
+      const match = email.match(/^[sd](\d{2})\d{2}@e-mirim\.hs\.kr$/); // 형식을 강제하며 s2531의 25만 추출
+      if (!match) {
+        throw new BadRequestException('올바른 학교 이메일이 아닙니다.');
+      }
+
+      const admissionYear = 2000 + parseInt(match[1]); // 25 -> 2025
+      const currentYear = new Date().getFullYear(); // 2026
+
+      // 재학생 : 올해 ~ 올해-2 입학 (올해가 2026년이니 26, 25, 24까지 재학생)
+      if (admissionYear < currentYear - 2 || admissionYear > currentYear) {
+        throw new BadRequestException('재학생만 가입할 수 있습니다.');
+      }
     }
 
     // 6자리 랜덤 코드 생성
@@ -107,13 +111,10 @@ export class AuthService {
     if (!verification || !verification.is_verified) {
       throw new BadRequestException('이메일 인증을 먼저 완료해주세요.');
     }
-
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
     const exists = await this.userRepository.findOne({
       where: { email: dto.email },
     });
-    if (exists) {
-      throw new ConflictException('이미 가입된 이메일입니다.');
-    }
 
     const room = await this.roomRepository.findOne({
       where: { room_number: dto.room_number },
@@ -122,7 +123,24 @@ export class AuthService {
       throw new NotFoundException('존재하지 않는 방 번호입니다.');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    if (exists) {
+      if (exists.role !== UserRole.ADMIN) {
+        throw new ConflictException('이미 가입된 이메일입니다.');
+      }
+      // ADMIN이면 기존 정보 업데이트
+
+      exists.username = dto.username;
+      exists.room_id = room.id;
+      exists.grade = dto.grade;
+      exists.class_no = dto.class_no;
+      exists.can_staying = dto.can_staying;
+      exists.password = hashedPassword;
+
+      const saved = await this.userRepository.save(exists);
+
+      const { password, ...result } = saved;
+      return result;
+    }
 
     const user = this.userRepository.create({
       email: dto.email,
