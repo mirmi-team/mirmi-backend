@@ -32,7 +32,7 @@ export class AuthService {
   ) {}
 
   async sendVerificationCode(email: string) {
-    const match = email.match(/^s(\d{2})\d+@e-mirim\.hs\.kr$/);
+    const match = email.match(/^[sd](\d{2})\d{2}@e-mirim\.hs\.kr$/); // 형식을 강제하며 s2531의 25만 추출
     if (!match) {
       throw new BadRequestException('올바른 학교 이메일이 아닙니다.');
     }
