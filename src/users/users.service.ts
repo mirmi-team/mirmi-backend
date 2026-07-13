@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
@@ -52,8 +54,14 @@ export class UsersService {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
-    // DB엔 경로만 저장
-    user.profile_image = `uploads/profile/${filename}`;
+    const newProfileImage = `uploads/profile/${filename}`;
+
+    if (user.profile_image && user.profile_image !== newProfileImage) {
+      const oldPath = path.join(process.cwd(), user.profile_image);
+      fs.unlink(oldPath, () => {});
+    }
+
+    user.profile_image = newProfileImage;
     await this.userRepository.save(user);
 
     return {
