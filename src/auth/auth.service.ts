@@ -134,6 +134,7 @@ export class AuthService {
       exists.grade = dto.grade;
       exists.class_no = dto.class_no;
       exists.can_staying = dto.can_staying;
+      exists.gender = dto.gender;
       exists.password = hashedPassword;
 
       const saved = await this.userRepository.save(exists);
@@ -149,6 +150,7 @@ export class AuthService {
       password: hashedPassword,
       can_staying: dto.can_staying,
       grade: dto.grade,
+      gender: dto.gender,
       class_no: dto.class_no,
     });
     const saved = await this.userRepository.save(user);

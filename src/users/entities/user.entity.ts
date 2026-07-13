@@ -14,6 +14,11 @@ export enum UserRole {
   ADMIN = 'ADMIN',
 }
 
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
@@ -55,6 +60,13 @@ export class User {
 
   @Column({ nullable: true })
   profile_image: string;
+
+  @Column({
+    type: 'enum',
+    enum: Gender,
+    nullable: true,
+  })
+  gender: Gender;
 
   @ManyToOne(() => Room)
   @JoinColumn({ name: 'room_id' })
