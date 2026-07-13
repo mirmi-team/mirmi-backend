@@ -38,10 +38,9 @@ export class UsersController {
       // 'image'라는 필드명으로 파일 받음
       storage: diskStorage({
         destination: './uploads/profile', // 저장 위치
-        filename: (req, file, callback) => {
-          // 파일명: 타임스탬프 + 원래 확장자 (중복 방지)
-          const uniqueName = `${Date.now()}${extname(file.originalname)}`;
-          callback(null, uniqueName);
+        filename: (req: any, file, callback) => {
+          const userId = req.user?.id ?? 'unknown';
+          callback(null, `id_${userId}${extname(file.originalname)}`);
         },
       }),
     }),
