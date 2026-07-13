@@ -6,7 +6,9 @@ import {
   IsBoolean,
   Max,
   Min,
+  IsEnum,
 } from 'class-validator';
+import { Gender } from 'src/users/entities/user.entity';
 
 export class RegisterDto {
   @IsEmail()
@@ -34,4 +36,7 @@ export class RegisterDto {
   @Min(1)
   @Max(6)
   class_no: number;
+
+  @IsEnum(Gender)
+  gender: Gender;
 }
