@@ -82,7 +82,8 @@ export class UsersService {
       await bucket.remove([oldStoragePath]);
     }
 
-    user.profile_image = publicUrl;
+    // 경로가 같으면 URL도 같아 CDN/브라우저 캐시에 이전 이미지가 남으므로 버전 쿼리로 무효화
+    user.profile_image = `${publicUrl}?v=${Date.now()}`;
     await this.userRepository.save(user);
 
     return {
@@ -95,6 +96,7 @@ export class UsersService {
     if (!publicUrl) return null;
     const marker = `/object/public/${PROFILE_IMAGE_BUCKET}/`;
     const index = publicUrl.indexOf(marker);
-    return index === -1 ? null : publicUrl.slice(index + marker.length);
+    if (index === -1) return null;
+    return publicUrl.slice(index + marker.length).split('?')[0];
   }
 }

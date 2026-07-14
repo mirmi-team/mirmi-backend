@@ -35,12 +35,12 @@ export class UsersController {
   @UseInterceptors(
     FileInterceptor('image', {
       // 'image'라는 필드명으로 파일 받음. Supabase Storage로 업로드하므로 메모리에만 보관
-      storage: memoryStorage(),
+      storage: memoryStorage(), // 메모리에 올렸다가 supabase로 업로드
     }),
   )
   uploadProfileImage(
     @GetUser() user,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File, //
   ) {
     return this.usersService.updateProfileImage(user.id, file);
   }
