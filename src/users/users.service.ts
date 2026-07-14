@@ -7,15 +7,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
-import * as fs from 'fs';
-import * as path from 'path';
+import { extname } from 'path';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SupabaseService } from '../common/supabase/supabase.service';
+
+const PROFILE_IMAGE_BUCKET = 'profile-image';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   async findMe(userId: number) {
@@ -48,25 +51,50 @@ export class UsersService {
     return { message: '비밀번호가 변경되었습니다.' };
   }
 
-  async updateProfileImage(userId: number, filename: string) {
+  async updateProfileImage(userId: number, file: Express.Multer.File) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
 
-    const newProfileImage = `uploads/profile/${filename}`;
+    const storagePath = `id_${userId}${extname(file.originalname)}`;
+    const bucket =
+      this.supabaseService.client.storage.from(PROFILE_IMAGE_BUCKET);
 
-    if (user.profile_image && user.profile_image !== newProfileImage) {
-      const oldPath = path.join(process.cwd(), user.profile_image);
-      fs.unlink(oldPath, () => {});
+    const { error: uploadError } = await bucket.upload(
+      storagePath,
+      file.buffer,
+      { contentType: file.mimetype, upsert: true },
+    );
+    if (uploadError) {
+      throw new BadRequestException(
+        `프로필 사진 업로드에 실패했습니다: ${uploadError.message}`,
+      );
     }
 
-    user.profile_image = newProfileImage;
+    const {
+      data: { publicUrl },
+    } = bucket.getPublicUrl(storagePath);
+
+    // 확장자가 바뀌어 이전과 다른 오브젝트로 저장된 경우, 기존 오브젝트는 정리
+    const oldStoragePath = this.extractStoragePath(user.profile_image);
+    if (oldStoragePath && oldStoragePath !== storagePath) {
+      await bucket.remove([oldStoragePath]);
+    }
+
+    user.profile_image = publicUrl;
     await this.userRepository.save(user);
 
     return {
       message: '프로필 사진이 변경되었습니다.',
       profile_image: user.profile_image,
     };
+  }
+
+  private extractStoragePath(publicUrl: string | null): string | null {
+    if (!publicUrl) return null;
+    const marker = `/object/public/${PROFILE_IMAGE_BUCKET}/`;
+    const index = publicUrl.indexOf(marker);
+    return index === -1 ? null : publicUrl.slice(index + marker.length);
   }
 }

@@ -12,8 +12,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 
 @Controller('users')
 export class UsersController {
@@ -35,20 +34,14 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('image', {
-      // 'image'라는 필드명으로 파일 받음
-      storage: diskStorage({
-        destination: './uploads/profile', // 저장 위치
-        filename: (req: any, file, callback) => {
-          const userId = req.user?.id ?? 'unknown';
-          callback(null, `id_${userId}${extname(file.originalname)}`);
-        },
-      }),
+      // 'image'라는 필드명으로 파일 받음. Supabase Storage로 업로드하므로 메모리에만 보관
+      storage: memoryStorage(),
     }),
   )
   uploadProfileImage(
     @GetUser() user,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.usersService.updateProfileImage(user.id, file.filename);
+    return this.usersService.updateProfileImage(user.id, file);
   }
 }
