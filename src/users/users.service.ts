@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { extname } from 'path';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { SupabaseService } from '../common/supabase/supabase.service';
+import { Room } from 'src/rooms/entities/room.entity';
 
 const PROFILE_IMAGE_BUCKET = 'profile-image';
 
@@ -18,6 +19,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Room)
+    private roomRepository: Repository<Room>,
     private readonly supabaseService: SupabaseService,
   ) {}
 
@@ -27,9 +30,16 @@ export class UsersService {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
+    const roomNumber = await this.roomRepository.findOne({
+      where: { id: user.room_id },
+    });
+
     // 비밀번호 빼고 반환
     const { password, ...result } = user;
-    return result;
+    return {
+      ...result,
+      room_number: roomNumber,
+    };
   }
 
   async changePassword(userId: number, dto: ChangePasswordDto) {
