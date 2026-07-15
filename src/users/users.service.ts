@@ -25,20 +25,18 @@ export class UsersService {
   ) {}
 
   async findMe(userId: number) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: { room: true }, // 한 번에 조인
+    });
     if (!user) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    const roomNumber = await this.roomRepository.findOne({
-      where: { id: user.room_id },
-    });
-
-    // 비밀번호 빼고 반환
-    const { password, ...result } = user;
+    const { password, room, ...result } = user;
     return {
       ...result,
-      room_number: roomNumber,
+      room_number: room?.room_number,
     };
   }
 
