@@ -1,22 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
+import * as sgMail from '@sendgrid/mail';
 
 @Injectable()
 export class MailService {
-  private transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASS,
-    },
-    pool: true,
-    maxConnections: 5,
-  });
+  constructor() {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+  }
 
   async sendVerificationCode(to: string, code: string) {
-    await this.transporter.sendMail({
-      from: `"Mirmi" <${process.env.MAIL_USER}>`,
+    await sgMail.send({
       to,
+      from: process.env.SENDGRID_FROM!,
       subject: '[Mirmi] 이메일 인증번호',
       text: `인증번호는 ${code} 입니다. 5분 안에 입력해주세요.`,
     });
