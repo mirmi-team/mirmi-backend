@@ -15,6 +15,7 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoomsModule } from './rooms/rooms.module';
+import { SupabaseModule } from './common/supabase/supabase.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RoomsModule } from './rooms/rooms.module';
     ScheduleModule,
     RoomsModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    SupabaseModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
