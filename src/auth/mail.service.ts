@@ -9,6 +9,8 @@ export class MailService {
       user: process.env.MAIL_USER,
       pass: process.env.MAIL_PASS,
     },
+    pool: true,
+    maxConnections: 5,
   });
 
   async sendVerificationCode(to: string, code: string) {
