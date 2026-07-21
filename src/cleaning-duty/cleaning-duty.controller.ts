@@ -1,7 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { CleaningDutyService } from './cleaning-duty.service';
 import { CreateCleaningDutyDto } from './dto/create-cleaning-duty.dto';
 import { UpdateCleaningDutyDto } from './dto/update-cleaning-duty.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/users/entities/user.entity';
 
 @Controller('cleaning-duty')
 export class CleaningDutyController {
@@ -28,6 +32,8 @@ export class CleaningDutyController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.cleaningDutyService.remove(+id);
   }
