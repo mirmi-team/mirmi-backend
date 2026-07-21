@@ -9,6 +9,7 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    environment: production  # 이거 추가
 
     steps:
       - name: 코드 체크아웃
