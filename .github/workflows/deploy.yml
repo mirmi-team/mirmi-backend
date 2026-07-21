@@ -3,17 +3,39 @@ name: Deploy to AWS ECS
 on:
   push:
     branches:
-      - main  # main 브랜치에 push할 때만 실행
+      - main
 
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    environment: production  # 이거 추가
 
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: E2E 테스트 실행
+        run: npm run test:e2e
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM: ${{ secrets.SENDGRID_FROM }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
 
       - name: AWS 자격증명 설정
         uses: aws-actions/configure-aws-credentials@v4
