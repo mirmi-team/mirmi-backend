@@ -76,6 +76,6 @@ jobs:
           wait-for-service-stability: true
 
       - name: Railway 배포
-        run: npx @railway/cli deploy
+        run: npx @railway/cli up --ci
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
