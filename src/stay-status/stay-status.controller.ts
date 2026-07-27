@@ -1,7 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { StayStatusService } from './stay-status.service';
 import { CreateStayStatusDto } from './dto/create-stay-status.dto';
 import { UpdateStayStatusDto } from './dto/update-stay-status.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/users/entities/user.entity';
 
 @Controller('stay-status')
 export class StayStatusController {
@@ -28,6 +32,8 @@ export class StayStatusController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.stayStatusService.remove(+id);
   }
