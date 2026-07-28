@@ -14,8 +14,8 @@ interface RequestWithUser extends Request {
 
 /**
  * JwtAuthGuard(Passport 'jwt' 전략)가 인증에 성공하면
- * request.user에 JwtStrategy의 validate()가 반환한 값을 넣어줌.
- * 이 데코레이터는 그 request.user를 그대로 꺼내옴.
+ * request.user에 JwtStrategy의 validate()가 반환한 값을 넣어줍니다.
+ * 이 데코레이터는 그 request.user를 그대로 꺼내옵니다.
  *
  * 예: @CurrentUser() user, 또는 특정 필드만 @CurrentUser('id') id
  */
