@@ -1,40 +1,50 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { LaundryService } from './laundry.service';
 import { CreateLaundryDto } from './dto/create-laundry.dto';
-import { UpdateLaundryDto } from './dto/update-laundry.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { UserRole } from 'src/users/entities/user.entity';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller('laundry')
 export class LaundryController {
   constructor(private readonly laundryService: LaundryService) {}
 
-  @Post()
-  create(@Body() createLaundryDto: CreateLaundryDto) {
-    return this.laundryService.create(createLaundryDto);
-  }
-
+  // GET /laundry
   @Get()
-  findAll() {
-    return this.laundryService.findAll();
+  findAllMachines() {
+    return this.laundryService.findAllMachines();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.laundryService.findOne(+id);
+  // POST /laundry/requests
+  @Post('requests')
+  createReservation(
+    @Body() dto: CreateLaundryDto,
+    @CurrentUser() user: { id: number },
+  ) {
+    return this.laundryService.createReservation(dto, user.id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateLaundryDto: UpdateLaundryDto) {
-    return this.laundryService.update(+id, updateLaundryDto);
+  // GET /laundry/requests/me
+  @Get('requests/me')
+  findMyReservations(@CurrentUser() user: { id: number }) {
+    return this.laundryService.findMyReservations(user.id);
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.laundryService.remove(+id);
+  // DELETE /laundry/reservations/:id
+  @Delete('reservations/:id')
+  cancelReservation(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+  ) {
+    return this.laundryService.cancelReservation(id, user.id);
   }
 }
