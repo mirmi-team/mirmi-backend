@@ -275,4 +275,9 @@ export class AuthService {
     await this.refreshTokenRepository.delete({ user_id: userId });
     return { message: '로그아웃 되었습니다.' };
   }
+
+  async quit(userId: number) {
+    await this.userRepository.delete({ id: userId });
+    return { message: '회원 탈퇴 처리되었습니다.' };
+  }
 }
