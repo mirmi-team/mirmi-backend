@@ -41,6 +41,13 @@ export class AuthController {
   logout(@GetUser() user) {
     return this.authService.logout(user.id);
   }
+  
+  @Post('quit')
+  @UseGuards(JwtAuthGuard)
+  quit(@GetUser() user) {
+    return this.authService.quit(user.id);
+  }
+  
 
   
 }

@@ -106,18 +106,16 @@ describe('Auth (e2e)', () => {
 
   describe('POST /auth/signup', () => {
     it('이메일 인증 없이는 회원가입에 실패한다', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/auth/signup')
-        .send({
-          email: 'unverified-e2e-test@example.com',
-          password: 'password123',
-          username: 'e2e-unverified',
-          can_staying: true,
-          room_number: 101,
-          grade: 1,
-          class_no: 1,
-          gender: 'MALE',
-        });
+      const res = await request(app.getHttpServer()).post('/auth/signup').send({
+        email: 'unverified-e2e-test@example.com',
+        password: 'password123',
+        username: 'e2e-unverified',
+        can_staying: true,
+        room_number: 101,
+        grade: 1,
+        class_no: 1,
+        gender: 'MALE',
+      });
 
       expect(res.status).toBe(400);
     });
@@ -126,18 +124,16 @@ describe('Auth (e2e)', () => {
       const [room] = await roomRepository.find({ take: 1 });
       expect(room).toBeDefined();
 
-      const res = await request(app.getHttpServer())
-        .post('/auth/signup')
-        .send({
-          email: newUserEmail,
-          password: 'password123',
-          username: 'e2e-test-user',
-          can_staying: true,
-          room_number: room.room_number,
-          grade: 1,
-          class_no: 1,
-          gender: 'MALE',
-        });
+      const res = await request(app.getHttpServer()).post('/auth/signup').send({
+        email: newUserEmail,
+        password: 'password123',
+        username: 'e2e-test-user',
+        can_staying: true,
+        room_number: room.room_number,
+        grade: 1,
+        class_no: 1,
+        gender: 'MALE',
+      });
 
       expect(res.status).toBe(201);
       expect(res.body).toMatchObject({
@@ -151,18 +147,16 @@ describe('Auth (e2e)', () => {
     it('이미 가입된 이메일이면 409를 반환한다', async () => {
       const [room] = await roomRepository.find({ take: 1 });
 
-      const res = await request(app.getHttpServer())
-        .post('/auth/signup')
-        .send({
-          email: STUDENT_ACCOUNT.email,
-          password: 'password123',
-          username: 'dup-user',
-          can_staying: true,
-          room_number: room.room_number,
-          grade: 1,
-          class_no: 1,
-          gender: 'MALE',
-        });
+      const res = await request(app.getHttpServer()).post('/auth/signup').send({
+        email: STUDENT_ACCOUNT.email,
+        password: 'password123',
+        username: 'dup-user',
+        can_staying: true,
+        room_number: room.room_number,
+        grade: 1,
+        class_no: 1,
+        gender: 'MALE',
+      });
 
       expect(res.status).toBe(409);
     });
@@ -189,12 +183,10 @@ describe('Auth (e2e)', () => {
     });
 
     it('존재하지 않는 이메일이면 401을 반환한다', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: 'no-such-user@e-mirim.hs.kr',
-          password: STUDENT_ACCOUNT.password,
-        });
+      const res = await request(app.getHttpServer()).post('/auth/login').send({
+        email: 'no-such-user@e-mirim.hs.kr',
+        password: STUDENT_ACCOUNT.password,
+      });
 
       expect(res.status).toBe(401);
     });

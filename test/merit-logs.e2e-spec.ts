@@ -42,9 +42,8 @@ describe('MeritLogs (e2e)', () => {
     studentToken = studentLogin.accessToken;
     studentUserId = studentLogin.userId;
 
-    adminToken = (
-      await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password)
-    ).accessToken;
+    adminToken = (await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password))
+      .accessToken;
 
     const student = await userRepository.findOne({
       where: { id: studentUserId },
@@ -67,9 +66,7 @@ describe('MeritLogs (e2e)', () => {
 
   describe('GET /merit-logs/reasons', () => {
     it('사유 목록을 반환한다', async () => {
-      const res = await request(app.getHttpServer()).get(
-        '/merit-logs/reasons',
-      );
+      const res = await request(app.getHttpServer()).get('/merit-logs/reasons');
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
     });
