@@ -71,8 +71,10 @@ export class MorningSongsService {
 
   // 아침 노래 신청
   async create(dto: CreateMorningSongDto, userId: number) {
+    const play_date = this.getTomorrowKst();
+
     const count = await this.morningSongRepository.count({
-      where: { play_date: dto.play_date },
+      where: { play_date },
     });
 
     const morningSong = this.morningSongRepository.create({
@@ -80,7 +82,7 @@ export class MorningSongsService {
       song_name: dto.song_name,
       youtube_url: dto.youtube_url,
       thumbnail: dto.thumbnail,
-      play_date: dto.play_date,
+      play_date,
       play_order: count + 1,
     });
 
@@ -115,7 +117,7 @@ export class MorningSongsService {
   async findToday() {
     const todayKst = this.getTodayKst();
     return await this.morningSongRepository.find({
-      where: { play_date: todayKst },
+      where: { play_date: todayKst }, 
       order: { created_at: 'ASC' },
     });
   }
@@ -149,5 +151,12 @@ export class MorningSongsService {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     return kst.toISOString().slice(0, 10);
+  }
+
+  private getTomorrowKst(): string {
+    const tomorrow = new Date();
+    tomorrow.setHours(tomorrow.getHours() + 9); // KST
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
   }
 }
