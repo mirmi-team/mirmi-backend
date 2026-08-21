@@ -77,6 +77,12 @@ export class MorningSongsService {
       where: { play_date },
     });
 
+    if (count >= 10) {
+      throw new BadRequestException(
+        '해당 날짜의 기상송이 모두 마감되었습니다.',
+      );
+    }
+
     const morningSong = this.morningSongRepository.create({
       user_id: userId,
       song_name: dto.song_name,
@@ -117,7 +123,7 @@ export class MorningSongsService {
   async findToday() {
     const todayKst = this.getTodayKst();
     return await this.morningSongRepository.find({
-      where: { play_date: todayKst }, 
+      where: { play_date: todayKst },
       order: { created_at: 'ASC' },
     });
   }
