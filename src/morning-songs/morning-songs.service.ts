@@ -11,7 +11,6 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { MorningSong } from './entities/morning-song.entity';
 import { CreateMorningSongDto } from './dto/create-morning-song.dto';
-import { UpdateMorningSongOrderDto } from './dto/update-morning-song-order.dto';
 
 export interface YoutubeSearchResult {
   title: string;
@@ -117,7 +116,7 @@ export class MorningSongsService {
     const todayKst = this.getTodayKst();
     return await this.morningSongRepository.find({
       where: { play_date: todayKst },
-      order: { play_order: 'ASC' },
+      order: { created_at: 'ASC' },
     });
   }
 
@@ -129,22 +128,8 @@ export class MorningSongsService {
 
     return await this.morningSongRepository.find({
       where: { play_date: date },
-      order: { play_order: 'ASC' },
+      order: { created_at: 'ASC' },
     });
-  }
-
-  // 관리자 - 순서 변경
-  async updateOrder(id: number, dto: UpdateMorningSongOrderDto) {
-    const morningSong = await this.morningSongRepository.findOne({
-      where: { id },
-    });
-    if (!morningSong) {
-      throw new NotFoundException('신청 내역을 찾을 수 없습니다.');
-    }
-
-    morningSong.play_order = dto.play_order;
-    await this.morningSongRepository.save(morningSong);
-    return { message: '순서가 변경되었습니다.' };
   }
 
   // 관리자 - 삭제

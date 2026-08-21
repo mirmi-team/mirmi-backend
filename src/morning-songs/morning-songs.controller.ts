@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
   Delete,
   Body,
   Param,
@@ -19,7 +18,6 @@ import {
 } from '@nestjs/swagger';
 import { MorningSongsService } from './morning-songs.service';
 import { CreateMorningSongDto } from './dto/create-morning-song.dto';
-import { UpdateMorningSongOrderDto } from './dto/update-morning-song-order.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -81,21 +79,6 @@ export class MorningSongsController {
   @UseGuards(JwtAuthGuard)
   create(@Body() dto: CreateMorningSongDto, @GetUser() user) {
     return this.morningSongsService.create(dto, user.id);
-  }
-
-  // 관리자 - 순서 변경
-  @ApiOperation({ summary: '신청곡 순서 변경 (관리자)' })
-  @ApiResponse({ status: 200, description: '순서 변경 성공' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @Patch('admin/:id/order')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  updateOrder(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateMorningSongOrderDto,
-  ) {
-    return this.morningSongsService.updateOrder(id, dto);
   }
 
   // 관리자 - 삭제

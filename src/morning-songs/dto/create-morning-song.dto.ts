@@ -1,5 +1,5 @@
 // src/morning-songs/dto/create-morning-song.dto.ts
-import { IsString, IsNotEmpty, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMorningSongDto {
@@ -19,8 +19,4 @@ export class CreateMorningSongDto {
   @IsOptional()
   @IsString()
   thumbnail?: string;
-
-  @ApiProperty({ example: '2026-08-20' })
-  @IsDateString()
-  play_date: string;
 }
