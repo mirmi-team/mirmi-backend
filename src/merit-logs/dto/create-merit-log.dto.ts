@@ -12,7 +12,10 @@ export class CreateMeritLogDto {
   @IsEnum(MeritType)
   type: MeritType;
 
-  @ApiProperty({ example: 3 })
+  @ApiProperty({
+    example: 3,
+    description: '점수 크기(절댓값). 부호는 type에 따라 서버가 결정한다.',
+  })
   @IsInt()
   score: number;
 

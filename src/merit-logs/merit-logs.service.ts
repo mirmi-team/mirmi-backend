@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MeritLog } from './entities/merit-log.entity';
+import { MeritLog, MeritType } from './entities/merit-log.entity';
 import { MeritReason } from './entities/merit-reason.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateMeritLogDto } from './dto/create-merit-log.dto';
@@ -52,17 +52,23 @@ export class MeritLogsService {
     });
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
+    // type에 따라 부호 결정 (PENALTY는 음수, REWARD는 양수) - score는 항상 절댓값으로 취급
+    const signedScore =
+      dto.type === MeritType.PENALTY
+        ? -Math.abs(dto.score)
+        : Math.abs(dto.score);
+
     // merit_logs에 기록
     const log = this.meritLogRepository.create({
       user_id: dto.user_id,
       type: dto.type,
-      score: dto.score,
+      score: signedScore,
       reason: dto.reason,
     });
     await this.meritLogRepository.save(log);
 
-    // total_merit_score 갱신 (score가 음수면 자동으로 빠짐)
-    user.total_merit_score += dto.score;
+    // total_merit_score 갱신
+    user.total_merit_score += signedScore;
     await this.userRepository.save(user);
 
     return log;
