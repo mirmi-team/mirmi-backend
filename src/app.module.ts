@@ -16,6 +16,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoomsModule } from './rooms/rooms.module';
 import { SupabaseModule } from './common/supabase/supabase.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SupabaseModule } from './common/supabase/supabase.module';
     MeritLogsModule,
     ScheduleModule,
     RoomsModule,
+    ContactModule,
     ConfigModule.forRoot({ isGlobal: true }),
     SupabaseModule,
     TypeOrmModule.forRoot({

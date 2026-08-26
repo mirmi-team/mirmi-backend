@@ -85,4 +85,5 @@ export class SuggestionsController {
   remove(@GetUser() user: AuthUser, @Param('id') id: string) {
     return this.suggestionsService.remove(user.id, user.role, +id);
   }
+
 }
