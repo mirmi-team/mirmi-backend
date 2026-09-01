@@ -1,15 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import { Notice } from './entities/notice.entity';
 import { Between, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UpdateNoticeDto } from './dto/update-notice.dto';
+import { SupabaseService } from 'src/common/supabase/supabase.service';
+import { extname } from 'path';
 
 @Injectable()
 export class NoticesService {
   constructor(
     @InjectRepository(Notice)
     private noticeRepository: Repository<Notice>,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   async findOne() {
@@ -62,29 +69,71 @@ export class NoticesService {
     return notice;
   }
 
-  async create(dto: CreateNoticeDto) {
-    const notice = this.noticeRepository.create(dto);
-    return await this.noticeRepository.save(notice);
-  }
+  async create(dto: CreateNoticeDto, file?: Express.Multer.File) {
+    let image_url: string | null = null;
 
-  async update(id: number, dto: UpdateNoticeDto) {
-    const notice = await this.noticeRepository.findOne({ where: { id } });
-    if (!notice) {
-      throw new NotFoundException('공지사항을 찾을 수 없습니다.');
+    if (file) {
+      const fileName = `notice_${Date.now()}${extname(file.originalname)}`;
+      const bucket = this.supabaseService.client.storage.from('notice-images');
+
+      const { error } = await bucket.upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+      if (error)
+        throw new BadRequestException(`이미지 업로드 실패: ${error.message}`);
+
+      const {
+        data: { publicUrl },
+      } = bucket.getPublicUrl(fileName);
+      image_url = publicUrl;
     }
 
-    Object.assign(notice, dto); // dto에 있는 파일만 notice에 덮어씀
-    await this.noticeRepository.save(notice);
-    return { message: '공지사항이 수정되었습니다.' };
+    const notice = this.noticeRepository.create({ ...dto, image_url });
+    return this.noticeRepository.save(notice);
+  }
+
+  async update(id: number, dto: UpdateNoticeDto, file?: Express.Multer.File) {
+    const notice = await this.noticeRepository.findOneBy({ id });
+    if (!notice) throw new NotFoundException('공지사항을 찾을 수 없습니다.');
+
+    if (file) {
+      const bucket = this.supabaseService.client.storage.from('notice-images');
+
+      if (notice.image_url) {
+        const oldFileName = notice.image_url.split('/').pop()!.split('?')[0];
+        await bucket.remove([oldFileName]);
+      }
+
+      const fileName = `notice_${Date.now()}${extname(file.originalname)}`;
+      const { error } = await bucket.upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+      if (error)
+        throw new BadRequestException(`이미지 업로드 실패: ${error.message}`);
+
+      const {
+        data: { publicUrl },
+      } = bucket.getPublicUrl(fileName);
+      notice.image_url = publicUrl;
+    }
+
+    Object.assign(notice, dto);
+    return this.noticeRepository.save(notice);
   }
 
   async delete(id: number) {
-    const notice = await this.noticeRepository.findOne({ where: { id } });
-    if (!notice) {
-      throw new NotFoundException('공지사항을 찾을 수 없습니다.');
-    }
-    await this.noticeRepository.delete(id);
+    const notice = await this.noticeRepository.findOneBy({ id });
+    if (!notice) throw new NotFoundException('공지사항을 찾을 수 없습니다.');
 
-    return { message: '공지사항이 삭제되었습니다.' };
+    if (notice.image_url) {
+      const fileName = notice.image_url.split('/').pop()!.split('?')[0];
+      const bucket = this.supabaseService.client.storage.from('notice-images');
+      await bucket.remove([fileName]);
+    }
+
+    await this.noticeRepository.delete(id);
+    return { message: '삭제되었습니다.' };
   }
 }
