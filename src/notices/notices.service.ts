@@ -120,7 +120,8 @@ export class NoticesService {
     }
 
     Object.assign(notice, dto);
-    return this.noticeRepository.save(notice);
+    await this.noticeRepository.save(notice);
+    return { message: '공지사항이 수정되었습니다.' };
   }
 
   async delete(id: number) {
@@ -134,6 +135,6 @@ export class NoticesService {
     }
 
     await this.noticeRepository.delete(id);
-    return { message: '삭제되었습니다.' };
+    return { message: '공지사항이 삭제되었습니다.' };
   }
 }
