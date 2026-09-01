@@ -12,6 +12,8 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -44,6 +46,20 @@ export class UsersController {
     return this.usersService.changePassword(user.id, dto);
   }
 
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['image'],
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: '프로필 이미지 파일',
+        },
+      },
+    },
+  })
   @ApiOperation({ summary: '프로필 이미지 업로드' })
   @ApiResponse({ status: 200, description: '프로필 이미지 업로드 성공' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -61,4 +77,5 @@ export class UsersController {
   ) {
     return this.usersService.updateProfileImage(user.id, file);
   }
+  
 }

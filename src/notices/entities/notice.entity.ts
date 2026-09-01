@@ -18,4 +18,7 @@ export class Notice {
 
   @CreateDateColumn()
   created_at: Date;
+
+  @Column({ nullable: true, type: 'varchar' })
+  image_url: string | null;
 }
