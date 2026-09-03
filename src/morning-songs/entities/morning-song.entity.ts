@@ -4,6 +4,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  BeforeInsert,
 } from 'typeorm';
 
 @Entity('morning_songs')
@@ -31,4 +32,9 @@ export class MorningSong {
 
   @CreateDateColumn()
   created_at: Date;
+
+  @BeforeInsert()
+  setCreatedAt() {
+    this.created_at = new Date();
+  }
 }
