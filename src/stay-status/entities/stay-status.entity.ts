@@ -4,6 +4,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   UpdateDateColumn,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 
 export enum StayStatusType {
@@ -27,4 +29,10 @@ export class StayStatus {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  setUpdatedAt() {
+    this.updated_at = new Date();
+  }
 }
