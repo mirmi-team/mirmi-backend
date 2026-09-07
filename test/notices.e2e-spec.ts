@@ -120,6 +120,25 @@ describe('Notices (e2e)', () => {
         .send({ title: 'x' });
       expect(res.status).toBe(404);
     });
+
+    it('이미지 파일을 첨부하면 image_url이 갱신된다', async () => {
+      const testImage = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      );
+
+      const res = await request(app.getHttpServer())
+        .patch(`/notices/${createdNoticeId}`)
+        .set(authHeader(adminToken))
+        .attach('image', testImage, 'test.png');
+
+      expect(res.status).toBe(200);
+
+      const updated = await noticeRepository.findOne({
+        where: { id: createdNoticeId },
+      });
+      expect(updated?.image_url).toEqual(expect.stringContaining('notice_'));
+    });
   });
 
   describe('DELETE /notices/:id', () => {

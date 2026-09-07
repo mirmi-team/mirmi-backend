@@ -7,6 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  BeforeInsert,
 } from 'typeorm';
 
 export enum UserRole {
@@ -71,4 +72,9 @@ export class User {
   @ManyToOne(() => Room)
   @JoinColumn({ name: 'room_id' })
   room: Room;
+
+  @BeforeInsert()
+  setCreatedAt() {
+    this.created_at = new Date();
+  }
 }

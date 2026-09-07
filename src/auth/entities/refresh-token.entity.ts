@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { BeforeInsert, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('refresh_tokens')
 export class RefreshToken {
@@ -19,4 +19,9 @@ export class RefreshToken {
 
   @Column({ nullable: true })
   device_info: string;
+
+  @BeforeInsert()
+  setCreatedAt() {
+    this.created_at = new Date();
+  }
 }

@@ -1,4 +1,5 @@
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -18,4 +19,9 @@ export class Room {
 
   @CreateDateColumn()
   created_at: Date;
+
+  @BeforeInsert()
+  setCreatedAt() {
+    this.created_at = new Date();
+  }
 }

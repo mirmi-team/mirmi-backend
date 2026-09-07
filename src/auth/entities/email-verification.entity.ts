@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  BeforeInsert,
 } from 'typeorm';
 
 @Entity('email_verifications')
@@ -27,4 +28,9 @@ export class EmailVerification {
 
   @Column()
   expires_at: Date;
+
+  @BeforeInsert()
+  setCreatedAt() {
+    this.created_at = new Date();
+  }
 }

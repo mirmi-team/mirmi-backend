@@ -27,6 +27,7 @@ describe('MeritLogs (e2e)', () => {
   let originalTotalMeritScore: number;
   let createdReasonId: number;
   let createdLogId: number;
+  let penaltyLogId: number;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -54,6 +55,9 @@ describe('MeritLogs (e2e)', () => {
   afterAll(async () => {
     if (createdLogId) {
       await meritLogRepository.delete(createdLogId);
+    }
+    if (penaltyLogId) {
+      await meritLogRepository.delete(penaltyLogId);
     }
     if (createdReasonId) {
       await meritReasonRepository.delete(createdReasonId);
@@ -137,6 +141,37 @@ describe('MeritLogs (e2e)', () => {
       expect(summaryRes.body.total_merit_score).toBe(
         originalTotalMeritScore + 3,
       );
+    });
+
+    it('PENALTY 타입이면 양수 score를 보내도 누적 점수에서 차감된다', async () => {
+      const beforeRes = await request(app.getHttpServer())
+        .get('/merit-logs/me/summary')
+        .set(authHeader(studentToken));
+      const beforeScore = beforeRes.body.total_merit_score;
+
+      const res = await request(app.getHttpServer())
+        .post('/merit-logs/admin')
+        .set(authHeader(adminToken))
+        .send({
+          user_id: studentUserId,
+          type: 'PENALTY',
+          score: 2,
+          reason: 'e2e penalty test log',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({
+        user_id: studentUserId,
+        type: 'PENALTY',
+        score: -2,
+        reason: 'e2e penalty test log',
+      });
+      penaltyLogId = res.body.id;
+
+      const summaryRes = await request(app.getHttpServer())
+        .get('/merit-logs/me/summary')
+        .set(authHeader(studentToken));
+      expect(summaryRes.body.total_merit_score).toBe(beforeScore - 2);
     });
   });
 
