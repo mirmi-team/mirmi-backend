@@ -21,7 +21,7 @@ export class NoticesService {
 
   async findOne() {
     // 오늘 공지사항 최근 1개 조회
-    // 오늘 00:00:00.
+    // 오늘 00:00:00..
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
