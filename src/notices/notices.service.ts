@@ -34,7 +34,10 @@ export class NoticesService {
       where: {
         created_at: Between(startOfDay, endOfDay),
       },
-      order: { created_at: 'DESC' },
+      order: {
+        created_at: 'DESC',
+        id: 'DESC',
+      },
     });
 
     if (!notice) {
