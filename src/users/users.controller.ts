@@ -77,5 +77,4 @@ export class UsersController {
   ) {
     return this.usersService.updateProfileImage(user.id, file);
   }
-  
 }
