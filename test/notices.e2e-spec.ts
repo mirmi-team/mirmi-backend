@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import {
   ADMIN_ACCOUNT,
   STUDENT_ACCOUNT,
@@ -27,9 +27,8 @@ describe('Notices (e2e)', () => {
     studentToken = (
       await login(app, STUDENT_ACCOUNT.email, STUDENT_ACCOUNT.password)
     ).accessToken;
-    adminToken = (
-      await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password)
-    ).accessToken;
+    adminToken = (await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password))
+      .accessToken;
   });
 
   afterAll(async () => {
@@ -74,7 +73,20 @@ describe('Notices (e2e)', () => {
     it('오늘 등록된 공지사항 중 최신 1개를 반환한다', async () => {
       const res = await request(app.getHttpServer()).get('/notices/findOne');
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ id: createdNoticeId });
+
+      // 다른 관리자가 같은 날 공지를 추가로 올렸을 수도 있으므로,
+      // "내가 만든 공지"가 아니라 "오늘 범위에서 실제로 가장 최신인 공지"와 비교한다.
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+
+      const latestOfToday = await noticeRepository.findOne({
+        where: { created_at: Between(startOfDay, endOfDay) },
+        order: { created_at: 'DESC' },
+      });
+
+      expect(res.body).toMatchObject({ id: latestOfToday?.id });
     });
   });
 

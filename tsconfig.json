@@ -24,5 +24,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "strictPropertyInitialization": false,
+    "types": ["node", "jest"]
   }
 }
