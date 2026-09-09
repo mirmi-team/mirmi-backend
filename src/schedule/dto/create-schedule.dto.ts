@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateScheduleDto {
@@ -17,4 +17,11 @@ export class CreateScheduleDto {
   @IsString()
   @IsNotEmpty()
   description: string;
+
+  @ApiProperty({
+    description: '일정이 실제로 있는 날짜 (YYYY-MM-DD)',
+    example: '2026-08-31',
+  })
+  @IsDateString()
+  schedule_date: string;
 }

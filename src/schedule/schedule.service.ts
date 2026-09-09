@@ -14,6 +14,7 @@ export interface ScheduleRow {
   id: number;
   title: string;
   description: string;
+  schedule_date: string;
   created_at: string;
 }
 
@@ -36,8 +37,8 @@ export class ScheduleService {
   async findAll(): Promise<ScheduleRow[]> {
     const { data, error } = await this.client
       .from(SCHEDULE_TABLE)
-      .select('id, title, description, created_at')
-      .order('created_at', { ascending: false });
+      .select('id, title, description, schedule_date, created_at')
+      .order('schedule_date', { ascending: true });
 
     if (error) {
       throw new InternalServerErrorException(error.message);
@@ -49,7 +50,7 @@ export class ScheduleService {
   async findOne(id: number): Promise<ScheduleRow> {
     const { data, error } = await this.client
       .from(SCHEDULE_TABLE)
-      .select('id, title, description, created_at')
+      .select('id, title, description, schedule_date, created_at')
       .eq('id', id)
       .maybeSingle();
 
@@ -72,6 +73,7 @@ export class ScheduleService {
       .insert({
         title: dto.title,
         description: dto.description,
+        schedule_date: dto.schedule_date,
         created_at: new Date().toISOString(),
       })
       .select('id')
