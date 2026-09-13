@@ -48,10 +48,9 @@ describe('Users (e2e)', () => {
   });
 
   afterAll(async () => {
-    await userRepository.update(
-      studentUserId,
-      { profile_image: originalProfileImage },
-    );
+    await userRepository.update(studentUserId, {
+      profile_image: originalProfileImage,
+    });
     await app.close();
   });
 
@@ -121,6 +120,7 @@ describe('Users (e2e)', () => {
           oldPassword: tempPassword,
           newPassword: STUDENT_ACCOUNT.password,
         });
+
       expect(revertRes.status).toBe(200);
       expect(revertRes.body).toEqual({ message: '비밀번호가 변경되었습니다.' });
     });

@@ -27,9 +27,8 @@ describe('Notices (e2e)', () => {
     studentToken = (
       await login(app, STUDENT_ACCOUNT.email, STUDENT_ACCOUNT.password)
     ).accessToken;
-    adminToken = (
-      await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password)
-    ).accessToken;
+    adminToken = (await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password))
+      .accessToken;
   });
 
   afterAll(async () => {
