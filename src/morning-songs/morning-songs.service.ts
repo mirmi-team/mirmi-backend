@@ -134,6 +134,15 @@ export class MorningSongsService {
     });
   }
 
+  // 내일 신청곡 조회 (KST 기준)
+  async findTomorrow() {
+    const tomorrowKst = this.getTomorrowKst();
+    return await this.morningSongRepository.find({
+      where: { play_date: tomorrowKst },
+      order: { play_order: 'ASC' },
+    });
+  }
+
   // 관리자 - 날짜별 신청 목록 조회
   async findByDateForAdmin(date: string) {
     if (!date) {
