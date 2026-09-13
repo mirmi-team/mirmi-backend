@@ -20,18 +20,12 @@ export class NoticesService {
   ) {}
 
   async findOne() {
-    // 한국 시간(KST) 기준 오늘 날짜
-    const koreaDate = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    // 오늘 공지사항 최근 1개 조회
+    // 오늘 00:00:00..
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-    // 한국 시간 기준 오늘 00:00:00
-    const startOfDay = new Date(`${koreaDate}T00:00:00+09:00`);
-
-    // 한국 시간 기준 내일 00:00:00
+    // 내일 00:00:00 (오늘의 끝)
     const endOfDay = new Date(startOfDay);
     endOfDay.setTime(endOfDay.getTime() + 24 * 60 * 60 * 1000);
 
