@@ -83,13 +83,19 @@ export class MorningSongsService {
       );
     }
 
+    const lastSong = await this.morningSongRepository.findOne({
+      where: { play_date },
+      order: { play_order: 'DESC' },
+    });
+    const nextPlayOrder = (lastSong?.play_order ?? 0) + 1;
+
     const morningSong = this.morningSongRepository.create({
       user_id: userId,
       song_name: dto.song_name,
       youtube_url: dto.youtube_url,
       thumbnail: dto.thumbnail,
       play_date,
-      play_order: count + 1,
+      play_order: nextPlayOrder,
     });
 
     return await this.morningSongRepository.save(morningSong);
@@ -99,7 +105,7 @@ export class MorningSongsService {
   async findMine(userId: number) {
     return await this.morningSongRepository.find({
       where: { user_id: userId },
-      order: { created_at: 'DESC' },
+      order: { play_date: 'DESC', play_order: 'ASC' },
     });
   }
 
@@ -124,7 +130,7 @@ export class MorningSongsService {
     const todayKst = this.getTodayKst();
     return await this.morningSongRepository.find({
       where: { play_date: todayKst },
-      order: { created_at: 'ASC' },
+      order: { play_order: 'ASC' },
     });
   }
 
@@ -136,7 +142,7 @@ export class MorningSongsService {
 
     return await this.morningSongRepository.find({
       where: { play_date: date },
-      order: { created_at: 'ASC' },
+      order: { play_order: 'ASC' },
     });
   }
 
