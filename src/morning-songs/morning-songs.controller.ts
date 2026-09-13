@@ -49,6 +49,16 @@ export class MorningSongsController {
     return this.morningSongsService.findToday();
   }
 
+  // 내일 신청곡 조회 (KST 기준)
+  @ApiOperation({ summary: '내일 신청곡 조회 (KST 기준)' })
+  @ApiResponse({ status: 200, description: '조회 성공' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @Get('tomorrow')
+  @UseGuards(JwtAuthGuard)
+  findTomorrow() {
+    return this.morningSongsService.findTomorrow();
+  }
+
   // 내 신청 내역 조회
   @ApiOperation({ summary: '내 신청 내역 조회' })
   @ApiResponse({ status: 200, description: '조회 성공' })
