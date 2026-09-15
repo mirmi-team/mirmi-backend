@@ -8,7 +8,7 @@ export class CreateStayStatusDto {
   @IsEnum(StayStatusType)
   status: StayStatusType;
 
-  @ApiProperty({ example: '010-1234-5678', required: false })
+  @ApiProperty({ example: '010-1234-5678', required: true })
   @IsOptional()
   @IsString()
   parent_phone?: string;

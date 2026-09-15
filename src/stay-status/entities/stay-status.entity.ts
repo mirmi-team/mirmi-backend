@@ -27,7 +27,7 @@ export class StayStatus {
   @Column({ type: 'date' })
   week_start: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
+  @Column({ type: 'varchar', length: 20, nullable: false })
   parent_phone: string | null;
 
   @UpdateDateColumn()
