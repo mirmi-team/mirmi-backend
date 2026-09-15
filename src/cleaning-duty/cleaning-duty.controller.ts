@@ -1,40 +1,33 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { CleaningDutyService } from './cleaning-duty.service';
-import { CreateCleaningDutyDto } from './dto/create-cleaning-duty.dto';
-import { UpdateCleaningDutyDto } from './dto/update-cleaning-duty.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { UserRole } from 'src/users/entities/user.entity';
 
-@Controller('cleaning-duty')
+@ApiTags('CleaningDuty')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('cleanings')
 export class CleaningDutyController {
   constructor(private readonly cleaningDutyService: CleaningDutyService) {}
 
-  @Post()
-  create(@Body() createCleaningDutyDto: CreateCleaningDutyDto) {
-    return this.cleaningDutyService.create(createCleaningDutyDto);
-  }
-
+  // GET /cleanings?duty_date=2026-05-14
+  @ApiOperation({ summary: '아침 청소 당번 조회 (날짜별)' })
+  @ApiQuery({
+    name: 'duty_date',
+    required: true,
+    type: String,
+    description: '조회할 날짜 (YYYY-MM-DD)',
+  })
+  @ApiResponse({ status: 200, description: '조회 성공' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Get()
-  findAll() {
-    return this.cleaningDutyService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.cleaningDutyService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCleaningDutyDto: UpdateCleaningDutyDto) {
-    return this.cleaningDutyService.update(+id, updateCleaningDutyDto);
-  }
-
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.cleaningDutyService.remove(+id);
+  findAll(@Query('duty_date') dutyDate: string) {
+    return this.cleaningDutyService.findAll(dutyDate);
   }
 }
