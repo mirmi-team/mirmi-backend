@@ -43,6 +43,7 @@ export class StayStatusService {
     const stayStatus = this.stayStatusRepository.create({
       user_id: userId,
       status: dto.status,
+      parent_phone: dto.parent_phone,
       week_start,
     });
 
