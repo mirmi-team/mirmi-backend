@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 import { CreateContactDto } from './dto/create-contact.dto';
 
 interface ContactSender {
@@ -9,15 +9,13 @@ interface ContactSender {
 
 @Injectable()
 export class ContactService {
-  constructor() {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
-  }
+  private resend = new Resend(process.env.RESEND_API_KEY);
 
   async sendContactMail(sender: ContactSender, dto: CreateContactDto) {
     try {
-      await sgMail.send({
+      await this.resend.emails.send({
+        from: 'onboarding@resend.dev',
         to: 'mirmi.dev@gmail.com',
-        from: process.env.SENDGRID_FROM!,
         subject: `[문의] ${dto.subject}`,
         html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">

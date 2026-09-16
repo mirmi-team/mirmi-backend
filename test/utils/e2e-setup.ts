@@ -1,8 +1,13 @@
-// E2E 테스트에서는 실제 SendGrid API를 호출하지 않도록 Mock 처리한다.
-// (SendGrid 무료 한도 초과로 인한 401 에러 방지)
-jest.mock('@sendgrid/mail', () => ({
-  setApiKey: jest.fn(),
-  send: jest.fn().mockResolvedValue([{ statusCode: 202 }]),
+// E2E 테스트에서는 실제 Resend API를 호출하지 않도록 Mock 처리한다.
+// (Resend 무료 한도 초과 및 실제 메일 발송 방지)
+export const mockResendSend = jest
+  .fn()
+  .mockResolvedValue({ data: { id: 'mock-id' }, error: null });
+
+jest.mock('resend', () => ({
+  Resend: jest.fn().mockImplementation(() => ({
+    emails: { send: mockResendSend },
+  })),
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
