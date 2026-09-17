@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { extname } from 'path';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { Room } from 'src/rooms/entities/room.entity';
 
@@ -98,6 +100,43 @@ export class UsersService {
       message: '프로필 사진이 변경되었습니다.',
       profile_image: user.profile_image,
     };
+  }
+
+  async update(userId: number, dto: UpdateUserDto) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    if (dto.email !== undefined && dto.email !== user.email) {
+      const emailExists = await this.userRepository.findOne({
+        where: { email: dto.email },
+      });
+      if (emailExists) {
+        throw new ConflictException('이미 사용 중인 이메일입니다.');
+      }
+      user.email = dto.email;
+    }
+
+    if (dto.room_number !== undefined) {
+      const room = await this.roomRepository.findOne({
+        where: { room_number: dto.room_number },
+      });
+      if (!room) {
+        throw new NotFoundException('존재하지 않는 방 번호입니다.');
+      }
+      user.room_id = room.id;
+    }
+
+    if (dto.username !== undefined) user.username = dto.username;
+    if (dto.can_staying !== undefined) user.can_staying = dto.can_staying;
+    if (dto.grade !== undefined) user.grade = dto.grade;
+    if (dto.class_no !== undefined) user.class_no = dto.class_no;
+    if (dto.gender !== undefined) user.gender = dto.gender;
+
+    const saved = await this.userRepository.save(user);
+    const { password, ...result } = saved;
+    return result;
   }
 
   private extractStoragePath(publicUrl: string | null): string | null {
