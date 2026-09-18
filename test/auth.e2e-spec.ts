@@ -3,27 +3,20 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { Repository } from 'typeorm';
-// './utils/e2e-setup'가 '@sendgrid/mail'을 jest.mock 처리하므로,
-// 아래 sgMail import보다 반드시 먼저 로드되어야 한다 (import 순서 유지).
+// './utils/e2e-setup'가 'resend'를 jest.mock 처리하므로,
+// 아래 import보다 반드시 먼저 로드되어야 한다 (import 순서 유지).
 import {
   ADMIN_ACCOUNT,
   STUDENT_ACCOUNT,
   authHeader,
   createTestApp,
   login,
+  mockResendSend,
 } from './utils/e2e-setup';
-import sgMail from '@sendgrid/mail';
 import { User } from '../src/users/entities/user.entity';
 import { Room } from '../src/rooms/entities/room.entity';
 import { EmailVerification } from '../src/auth/entities/email-verification.entity';
 import { RefreshToken } from '../src/auth/entities/refresh-token.entity';
-
-// '@sendgrid/mail'은 test/utils/e2e-setup.ts에서 jest.mock 처리되어 있으므로,
-// 여기서 import한 sgMail은 실제 모듈이 아닌 Mock 객체다.
-const mockedSgMail = sgMail as unknown as {
-  send: jest.Mock;
-  setApiKey: jest.Mock;
-};
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -65,7 +58,7 @@ describe('Auth (e2e)', () => {
 
   describe('POST /auth/email/send', () => {
     beforeEach(() => {
-      mockedSgMail.send.mockClear();
+      mockResendSend.mockClear();
     });
 
     it('올바르지 않은 이메일 형식이면 400을 반환한다', async () => {
@@ -74,7 +67,7 @@ describe('Auth (e2e)', () => {
         .send({ email: 'not-an-email' });
 
       expect(res.status).toBe(400);
-      expect(mockedSgMail.send).not.toHaveBeenCalled();
+      expect(mockResendSend).not.toHaveBeenCalled();
     });
 
     it('이미 가입된 학생 이메일이면 409를 반환한다', async () => {
@@ -83,10 +76,10 @@ describe('Auth (e2e)', () => {
         .send({ email: STUDENT_ACCOUNT.email });
 
       expect(res.status).toBe(409);
-      expect(mockedSgMail.send).not.toHaveBeenCalled();
+      expect(mockResendSend).not.toHaveBeenCalled();
     });
 
-    it('신규 이메일이면 인증번호를 발송한다 (실제 메일 발송 대신 SendGrid Mock이 호출된다)', async () => {
+    it('신규 이메일이면 인증번호를 발송한다 (실제 메일 발송 대신 Resend Mock이 호출된다)', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/email/send')
         .send({ email: newUserEmail });
@@ -94,9 +87,9 @@ describe('Auth (e2e)', () => {
       expect(res.status).toBe(201);
       expect(res.body).toEqual({ message: '인증번호가 발송되었습니다.' });
 
-      // 실제 SendGrid API가 아닌 Mock이 호출되었는지 확인한다.
-      expect(mockedSgMail.send).toHaveBeenCalledTimes(1);
-      expect(mockedSgMail.send).toHaveBeenCalledWith(
+      // 실제 Resend API가 아닌 Mock이 호출되었는지 확인한다.
+      expect(mockResendSend).toHaveBeenCalledTimes(1);
+      expect(mockResendSend).toHaveBeenCalledWith(
         expect.objectContaining({ to: newUserEmail }),
       );
     });

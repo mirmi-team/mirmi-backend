@@ -1,16 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 
 @Injectable()
 export class MailService {
-  constructor() {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
-  }
+  private resend = new Resend(process.env.RESEND_API_KEY);
 
   async sendVerificationCode(to: string, code: string) {
-    await sgMail.send({
+    await this.resend.emails.send({
+      from: '미르미 <no-reply@mirmi.kr>',
       to,
-      from: process.env.SENDGRID_FROM!,
       subject: '[Mirmi] 이메일 인증번호',
       html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px;">
