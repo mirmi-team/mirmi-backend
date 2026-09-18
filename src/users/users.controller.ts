@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseIntPipe,
   Patch,
   UploadedFile,
   UseGuards,
@@ -14,11 +16,16 @@ import {
   ApiResponse,
   ApiConsumes,
   ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from './entities/user.entity';
 import { UsersService } from './users.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
@@ -76,5 +83,21 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File, //
   ) {
     return this.usersService.updateProfileImage(user.id, file);
+  }
+
+  @ApiOperation({ summary: '학생 정보 수정 (관리자 전용)' })
+  @ApiParam({ name: 'id', description: '수정할 학생 id', example: 1 })
+  @ApiResponse({ status: 200, description: '수정 성공' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: '관리자만 접근할 수 있음' })
+  @ApiResponse({ status: 404, description: '해당 학생을 찾을 수 없음' })
+  @Patch('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  updateByAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.usersService.update(id, dto);
   }
 }
