@@ -46,6 +46,9 @@ interface FixedScheduleRow {
   start_time: string; // 'HH:MM:SS'
   end_time: string;
   assigned_room: number | null;
+  // 슬롯 하나에 호실 2개가 배정되는 경우(둘이 순서를 합의해서 쓰는 경우)를 위한 필드.
+  // 단독 배정이면 null.
+  assigned_room_2: number | null;
 }
 
 export type ScheduleSlot = {
@@ -54,6 +57,8 @@ export type ScheduleSlot = {
   end_time: string;
   type: 'FIXED' | 'RESERVED' | 'OPEN';
   room_number: number | null;
+  // FIXED 슬롯에 호실이 2개 배정된 경우에만 값이 있음 (그 외엔 null)
+  room_number_2: number | null;
 };
 
 // Supabase 클라이언트가 Database 타입 생성 없이 쓰이고 있어 응답이 전부 any로 잡힙니다.
@@ -177,6 +182,7 @@ export class LaundryService {
           end_time: slot.end_time,
           type: 'FIXED',
           room_number: slot.assigned_room,
+          room_number_2: slot.assigned_room_2 ?? null,
         };
       }
 
@@ -194,6 +200,7 @@ export class LaundryService {
         end_time: slot.end_time,
         type: matched ? 'RESERVED' : 'OPEN',
         room_number: matched ? matched.room_number : null,
+        room_number_2: null,
       };
     });
   }
@@ -283,7 +290,13 @@ export class LaundryService {
         '해당 시간대는 세탁기 사용 시간표에 없는 시간입니다.',
       );
     }
-    if (slot.assigned_room != null && slot.assigned_room !== dto.room_number) {
+    // 이 슬롯이 고정 배정(단독 또는 호실 2개 중 하나)인데, 신청자 호실이
+    // 그 배정 호실 중 어디에도 해당하지 않으면 막습니다.
+    if (
+      slot.assigned_room != null &&
+      slot.assigned_room !== dto.room_number &&
+      slot.assigned_room_2 !== dto.room_number
+    ) {
       throw new ForbiddenException(
         '해당 시간대는 다른 호실에 고정 배정된 시간입니다.',
       );
