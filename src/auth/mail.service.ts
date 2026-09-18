@@ -7,7 +7,7 @@ export class MailService {
 
   async sendVerificationCode(to: string, code: string) {
     await this.resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: '미르미 <no-reply@mirmi.kr>',
       to,
       subject: '[Mirmi] 이메일 인증번호',
       html: `

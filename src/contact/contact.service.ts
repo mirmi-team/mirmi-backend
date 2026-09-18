@@ -14,7 +14,7 @@ export class ContactService {
   async sendContactMail(sender: ContactSender, dto: CreateContactDto) {
     try {
       await this.resend.emails.send({
-        from: 'onboarding@resend.dev',
+        from: '미르미 <no-reply@mirmi.kr>',
         to: 'mirmi.dev@gmail.com',
         subject: `[문의] ${dto.subject}`,
         html: `
