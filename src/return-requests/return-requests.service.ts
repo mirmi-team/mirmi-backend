@@ -42,13 +42,31 @@ function unwrap<T>(result: unknown): SupaResult<T> {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toKst(new Date()).dateStr;
 }
 
-// 입실 체크된 "시:분"이 어느 복귀 타입 시간대에 해당하는지 판단.
+// 서버가 어느 시간대로 돌고 있든(UTC든 KST든) 상관없이 항상 한국시간 기준으로
+// 계산하기 위한 헬퍼. Date.getHours() 등은 서버 시스템 시간대를 따라가서
+// 배포 환경에 따라 결과가 달라지는 버그가 있었어서, UTC 값에 9시간을 직접
+// 더해서 계산합니다.
+function toKst(date: Date): {
+  hours: number;
+  minutes: number;
+  dateStr: string;
+} {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    hours: kst.getUTCHours(),
+    minutes: kst.getUTCMinutes(),
+    dateStr: kst.toISOString().slice(0, 10),
+  };
+}
+
+// 입실 체크된 "시:분"(한국시간 기준)이 어느 복귀 타입 시간대에 해당하는지 판단.
 // 어느 시간대에도 안 걸치면 null (타입 없이 저장).
 function resolveReturnTypeByTime(date: Date): ReturnType | null {
-  const minutes = date.getHours() * 60 + date.getMinutes();
+  const { hours, minutes } = toKst(date);
+  const nowMinutes = hours * 60 + minutes;
   const inRange = (
     startH: number,
     startM: number,
@@ -57,7 +75,7 @@ function resolveReturnTypeByTime(date: Date): ReturnType | null {
   ) => {
     const start = startH * 60 + startM;
     const end = endH * 60 + endM;
-    return minutes >= start && minutes <= end;
+    return nowMinutes >= start && nowMinutes <= end;
   };
 
   if (inRange(8, 0, 16, 30)) return ReturnType.IMMEDIATE; // 바로 복귀 08:00~16:30
@@ -68,6 +86,21 @@ function resolveReturnTypeByTime(date: Date): ReturnType | null {
 
 @Injectable()
 export class ReturnRequestsService {
+  // 이미 스캔 처리된 토큰을 잠깐(만료 시각까지) 기억해서 같은 QR이
+  // 30초 안에 두 번 스캔되는 걸 막습니다. 서버 인스턴스 하나짜리 소규모
+  // 서비스라 메모리에 두는 걸로 충분합니다 (재시작하면 초기화되지만,
+  // 재시작 시점엔 어차피 그 토큰들도 대부분 만료돼있을 시간이라 문제없음).
+  private readonly usedTokens = new Map<string, number>(); // token -> 만료시각(ms)
+
+  private pruneUsedTokens(): void {
+    const now = Date.now();
+    for (const [token, expiresAt] of this.usedTokens) {
+      if (expiresAt < now) {
+        this.usedTokens.delete(token);
+      }
+    }
+  }
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
@@ -213,6 +246,14 @@ export class ReturnRequestsService {
         '만료된 QR입니다. 학생에게 QR을 다시 띄워달라고 해주세요.',
       );
     }
+
+    this.pruneUsedTokens();
+    if (this.usedTokens.has(dto.token)) {
+      throw new BadRequestException(
+        '이미 처리된 QR입니다. 다시 스캔할 필요 없습니다.',
+      );
+    }
+    this.usedTokens.set(dto.token, issuedAt + QR_TOKEN_TTL_MS);
 
     const userId = Number(userIdStr);
     const returnType = resolveReturnTypeByTime(new Date());
