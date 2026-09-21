@@ -3,9 +3,10 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseService } from 'src/common/supabase/supabase.service';
-import { randomBytes } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
 import {
   CreateReturnRequestDto,
@@ -14,23 +15,15 @@ import {
 import { VerifyReturnDto } from './dto/verify-return.dto';
 
 const RETURN_REQUESTS_TABLE = 'return_requests';
-const QR_TOKEN_TABLE = 'return_qr_token';
-const QR_TOKEN_TTL_MS = 5 * 60 * 1000; // 5분
+const QR_TOKEN_TTL_MS = 30 * 1000; // 30초
 
 export interface ReturnRequestRow {
   id: number;
   user_id: number;
-  return_type: ReturnType;
+  return_type: ReturnType | null;
   reason: string | null;
   actual_return_time: string | null;
   request_date: string;
-}
-
-interface QrTokenRow {
-  id: number;
-  token: string;
-  expires_at: string;
-  created_at: string;
 }
 
 interface SupaError {
@@ -52,12 +45,45 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// 입실 체크된 "시:분"이 어느 복귀 타입 시간대에 해당하는지 판단.
+// 어느 시간대에도 안 걸치면 null (타입 없이 저장).
+function resolveReturnTypeByTime(date: Date): ReturnType | null {
+  const minutes = date.getHours() * 60 + date.getMinutes();
+  const inRange = (
+    startH: number,
+    startM: number,
+    endH: number,
+    endM: number,
+  ) => {
+    const start = startH * 60 + startM;
+    const end = endH * 60 + endM;
+    return minutes >= start && minutes <= end;
+  };
+
+  if (inRange(8, 0, 16, 30)) return ReturnType.IMMEDIATE; // 바로 복귀 08:00~16:30
+  if (inRange(17, 20, 18, 20)) return ReturnType.DINNER; // 석식 복귀 17:20~18:20
+  if (inRange(18, 20, 20, 30)) return ReturnType.EIGHT_PM; // 8시 복귀 18:20~20:30
+  return null;
+}
+
 @Injectable()
 export class ReturnRequestsService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly configService: ConfigService,
+  ) {}
 
   private get client(): SupabaseClient {
     return this.supabaseService.client as SupabaseClient;
+  }
+
+  // 학생 QR 서명에 쓰는 비밀키. 로그인 토큰과 같은 값을 재사용합니다.
+  private get qrSecret(): string {
+    return this.configService.getOrThrow<string>('JWT_ACCESS_SECRET');
+  }
+
+  private sign(payload: string): string {
+    return createHmac('sha256', this.qrSecret).update(payload).digest('hex');
   }
 
   // GET /returns - 로그인한 본인의 오늘 복귀 기록 (아직 없으면 null)
@@ -77,7 +103,7 @@ export class ReturnRequestsService {
     return data;
   }
 
-  // POST /returns - 오늘 복귀 시간 등록/수정 (오늘 기록 있으면 수정, 없으면 새로 생성)
+  // POST /returns - 오늘 복귀 예정 시간 사전 등록/수정 (참고용. 실제 타입은 QR 체크인 때 자동 결정됨)
   async upsert(
     dto: CreateReturnRequestDto,
     userId: number,
@@ -139,80 +165,59 @@ export class ReturnRequestsService {
     };
   }
 
-  // GET /admin/returns/qr - 현재 유효한 QR 토큰을 반환.
-  // 없거나 5분이 지나 만료됐으면 새로 발급. 호출부(사감 화면)가 주기적으로
-  // 다시 호출하기만 하면 자연스럽게 5분마다 새 QR로 바뀝니다.
-  async getOrRefreshQr(): Promise<{
+  // GET /returns/qr - 학생 본인의 30초짜리 QR 발급 (user_id + 발급시각을 서명)
+  async generateMyQr(userId: number): Promise<{
     token: string;
-    expiresAt: string;
     qrImage: string;
+    expiresAt: string;
   }> {
-    const { data: latest, error: findError } = unwrap<QrTokenRow | null>(
-      await this.client
-        .from(QR_TOKEN_TABLE)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    );
-
-    if (findError) {
-      throw new InternalServerErrorException(findError.message);
-    }
-
-    const now = Date.now();
-    if (latest && new Date(latest.expires_at).getTime() > now) {
-      const qrImage = await QRCode.toDataURL(latest.token);
-      return { token: latest.token, expiresAt: latest.expires_at, qrImage };
-    }
-
-    const token = randomBytes(16).toString('hex');
-    const expiresAt = new Date(now + QR_TOKEN_TTL_MS).toISOString();
-
-    const { error } = unwrap<null>(
-      await this.client
-        .from(QR_TOKEN_TABLE)
-        .insert({ token, expires_at: expiresAt }),
-    );
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
+    const issuedAt = Date.now();
+    const payload = `${userId}.${issuedAt}`;
+    const token = `${payload}.${this.sign(payload)}`;
 
     const qrImage = await QRCode.toDataURL(token);
-    return { token, expiresAt, qrImage };
+
+    return {
+      token,
+      qrImage,
+      expiresAt: new Date(issuedAt + QR_TOKEN_TTL_MS).toISOString(),
+    };
   }
 
-  // POST /returns/verify - 학생이 QR을 스캔해서 실제 복귀 시간을 기록
-  async verify(
+  // POST /admin/returns/verify - 사감이 학생 QR을 스캔해서 실제 복귀 확인.
+  // 지금 시각이 어느 복귀 타입 시간대에 해당하는지 자동으로 판단해서 저장.
+  async verifyByAdmin(
     dto: VerifyReturnDto,
-    userId: number,
-  ): Promise<{ message: string }> {
-    const { data: latest, error: findError } = unwrap<QrTokenRow | null>(
-      await this.client
-        .from(QR_TOKEN_TABLE)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    );
+  ): Promise<{ message: string; returnType: ReturnType | null }> {
+    const parts = dto.token.split('.');
+    if (parts.length !== 3) {
+      throw new BadRequestException('유효하지 않은 QR입니다.');
+    }
+    const [userIdStr, issuedAtStr, signature] = parts;
+    const payload = `${userIdStr}.${issuedAtStr}`;
+    const expected = this.sign(payload);
 
-    if (findError) {
-      throw new InternalServerErrorException(findError.message);
+    const signatureBuf = Buffer.from(signature, 'hex');
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const isValidSignature =
+      signatureBuf.length === expectedBuf.length &&
+      timingSafeEqual(signatureBuf, expectedBuf);
+
+    if (!isValidSignature) {
+      throw new BadRequestException('유효하지 않은 QR입니다.');
     }
 
-    if (!latest || latest.token !== dto.token) {
-      throw new BadRequestException('유효하지 않은 QR코드입니다.');
-    }
-    if (new Date(latest.expires_at).getTime() <= Date.now()) {
+    const issuedAt = Number(issuedAtStr);
+    if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > QR_TOKEN_TTL_MS) {
       throw new BadRequestException(
-        '만료된 QR코드입니다. 화면을 새로고침한 뒤 다시 스캔해주세요.',
+        '만료된 QR입니다. 학생에게 QR을 다시 띄워달라고 해주세요.',
       );
     }
 
-    const { data: existing, error: existingError } = unwrap<{
-      id: number;
-    } | null>(
+    const userId = Number(userIdStr);
+    const returnType = resolveReturnTypeByTime(new Date());
+
+    const { data: existing, error: findError } = unwrap<{ id: number } | null>(
       await this.client
         .from(RETURN_REQUESTS_TABLE)
         .select('id')
@@ -221,26 +226,39 @@ export class ReturnRequestsService {
         .maybeSingle(),
     );
 
-    if (existingError) {
-      throw new InternalServerErrorException(existingError.message);
+    if (findError) {
+      throw new InternalServerErrorException(findError.message);
     }
-    if (!existing) {
-      throw new BadRequestException(
-        '먼저 복귀 시간을 등록해주세요. (POST /returns)',
+
+    if (existing) {
+      const { error } = unwrap<null>(
+        await this.client
+          .from(RETURN_REQUESTS_TABLE)
+          .update({
+            actual_return_time: new Date().toISOString(),
+            return_type: returnType,
+          })
+          .eq('id', existing.id),
       );
+
+      if (error) {
+        throw new InternalServerErrorException(error.message);
+      }
+    } else {
+      const { error } = unwrap<null>(
+        await this.client.from(RETURN_REQUESTS_TABLE).insert({
+          user_id: userId,
+          request_date: today(),
+          actual_return_time: new Date().toISOString(),
+          return_type: returnType,
+        }),
+      );
+
+      if (error) {
+        throw new InternalServerErrorException(error.message);
+      }
     }
 
-    const { error } = unwrap<null>(
-      await this.client
-        .from(RETURN_REQUESTS_TABLE)
-        .update({ actual_return_time: new Date().toISOString() })
-        .eq('id', existing.id),
-    );
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-
-    return { message: '복귀가 확인되었습니다.' };
+    return { message: '복귀가 확인되었습니다.', returnType };
   }
 }

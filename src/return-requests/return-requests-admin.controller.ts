@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -6,6 +6,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { ReturnRequestsService } from './return-requests.service';
+import { VerifyReturnDto } from './dto/verify-return.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -18,18 +19,22 @@ import { UserRole } from 'src/users/entities/user.entity';
 export class ReturnRequestsAdminController {
   constructor(private readonly returnRequestsService: ReturnRequestsService) {}
 
-  // GET /admin/returns/qr
+  // POST /admin/returns/verify
   @ApiOperation({
-    summary: '복귀 확인용 QR코드 조회/발급 (관리자 전용, 5분마다 자동 갱신)',
+    summary: '학생 QR 스캔으로 복귀 확인 (사감 전용)',
     description:
-      '호출 시점에 현재 QR 토큰이 유효하면 그대로 반환하고, 5분이 지나 만료됐으면 새로 발급합니다. 사감 화면에서 이 API를 주기적으로 다시 호출하면 자연스럽게 5분마다 새 QR로 바뀝니다.',
+      '학생 화면에 뜬 QR을 스캔한 값을 그대로 넘기면 됩니다. 지금 시각을 기준으로 복귀 타입(바로복귀/석식복귀/8시복귀)이 자동으로 결정되어 저장됩니다. 해당 시간대가 아니면 타입 없이 저장됩니다.',
   })
-  @ApiResponse({ status: 200, description: '조회/발급 성공' })
+  @ApiResponse({ status: 201, description: '복귀 확인 성공' })
+  @ApiResponse({
+    status: 400,
+    description: '유효하지 않거나 만료(30초 경과)된 QR',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: '관리자만 접근할 수 있음' })
   @Roles(UserRole.ADMIN)
-  @Get('qr')
-  getQr() {
-    return this.returnRequestsService.getOrRefreshQr();
+  @Post('verify')
+  verify(@Body() dto: VerifyReturnDto) {
+    return this.returnRequestsService.verifyByAdmin(dto);
   }
 }

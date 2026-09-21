@@ -7,7 +7,6 @@ import {
 } from '@nestjs/swagger';
 import { ReturnRequestsService } from './return-requests.service';
 import { CreateReturnRequestDto } from './dto/create-return-request.dto';
-import { VerifyReturnDto } from './dto/verify-return.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
@@ -28,7 +27,11 @@ export class ReturnRequestsController {
   }
 
   // POST /returns
-  @ApiOperation({ summary: '오늘 복귀 시간 등록/수정' })
+  @ApiOperation({
+    summary: '오늘 복귀 예정 시간 사전 등록/수정',
+    description:
+      '참고용 사전 신청입니다. 실제 return_type은 QR 체크인 시각을 기준으로 서버가 자동으로 다시 결정합니다.',
+  })
   @ApiResponse({ status: 201, description: '등록/수정 성공' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post()
@@ -39,16 +42,16 @@ export class ReturnRequestsController {
     return this.returnRequestsService.upsert(dto, user.id);
   }
 
-  // POST /returns/verify
-  @ApiOperation({ summary: 'QR코드 스캔으로 실제 복귀 확인' })
-  @ApiResponse({ status: 201, description: '복귀 확인 성공' })
-  @ApiResponse({
-    status: 400,
-    description: '유효하지 않거나 만료된 QR, 또는 사전 등록 없음',
+  // GET /returns/qr
+  @ApiOperation({
+    summary: '내 복귀 인증용 QR 발급 (30초 후 만료)',
+    description:
+      '학생 본인 화면에 QR을 띄워두면, 사감이 그 QR을 스캔해서 복귀를 확인합니다. 30초마다 화면을 새로고침해서 새 QR을 다시 받아야 합니다.',
   })
+  @ApiResponse({ status: 200, description: '발급 성공' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @Post('verify')
-  verify(@Body() dto: VerifyReturnDto, @CurrentUser() user: { id: number }) {
-    return this.returnRequestsService.verify(dto, user.id);
+  @Get('qr')
+  getMyQr(@CurrentUser() user: { id: number }) {
+    return this.returnRequestsService.generateMyQr(user.id);
   }
 }
