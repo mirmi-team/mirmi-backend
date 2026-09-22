@@ -258,19 +258,50 @@ export class ReturnRequestsService {
     const userId = Number(userIdStr);
     const returnType = resolveReturnTypeByTime(new Date());
 
-    // 체크인마다 새 기록을 남깁니다 (기존 행을 덮어쓰지 않음 -
-    // 하루에 바로복귀 후 석식복귀처럼 여러 번 체크인해도 이력이 다 남아요).
-    const { error } = unwrap<null>(
-      await this.client.from(RETURN_REQUESTS_TABLE).insert({
-        user_id: userId,
-        request_date: today(),
-        actual_return_time: new Date().toISOString(),
-        return_type: returnType,
-      }),
+    // 오늘 이미 같은 return_type으로 체크인한 기록이 있으면 그 행의 시각만
+    // 갱신하고, 없으면(처음이거나 이전과 다른 타입이면) 새 행을 추가합니다.
+    let existingQuery = this.client
+      .from(RETURN_REQUESTS_TABLE)
+      .select('id')
+      .eq('user_id', userId)
+      .eq('request_date', today());
+    existingQuery =
+      returnType == null
+        ? existingQuery.is('return_type', null)
+        : existingQuery.eq('return_type', returnType);
+
+    const { data: existing, error: findError } = unwrap<{ id: number } | null>(
+      await existingQuery.maybeSingle(),
     );
 
-    if (error) {
-      throw new InternalServerErrorException(error.message);
+    if (findError) {
+      throw new InternalServerErrorException(findError.message);
+    }
+
+    if (existing) {
+      const { error } = unwrap<null>(
+        await this.client
+          .from(RETURN_REQUESTS_TABLE)
+          .update({ actual_return_time: new Date().toISOString() })
+          .eq('id', existing.id),
+      );
+
+      if (error) {
+        throw new InternalServerErrorException(error.message);
+      }
+    } else {
+      const { error } = unwrap<null>(
+        await this.client.from(RETURN_REQUESTS_TABLE).insert({
+          user_id: userId,
+          request_date: today(),
+          actual_return_time: new Date().toISOString(),
+          return_type: returnType,
+        }),
+      );
+
+      if (error) {
+        throw new InternalServerErrorException(error.message);
+      }
     }
 
     return { message: '복귀가 확인되었습니다.', returnType };
