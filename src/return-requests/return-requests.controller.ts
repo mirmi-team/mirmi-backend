@@ -18,8 +18,11 @@ export class ReturnRequestsController {
   constructor(private readonly returnRequestsService: ReturnRequestsService) {}
 
   // GET /returns
-  @ApiOperation({ summary: '내 오늘 복귀 정보 조회' })
-  @ApiResponse({ status: 200, description: '조회 성공 (등록 전이면 null)' })
+  @ApiOperation({ summary: '내 오늘 복귀 기록 전체 조회' })
+  @ApiResponse({
+    status: 200,
+    description: '조회 성공 (오늘 체크인이 없으면 빈 배열)',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Get()
   findMine(@CurrentUser() user: { id: number }) {
