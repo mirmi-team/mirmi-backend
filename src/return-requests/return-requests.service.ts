@@ -4,8 +4,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseService } from 'src/common/supabase/supabase.service';
+import { User } from 'src/users/entities/user.entity';
 import { createHmac, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
 import {
@@ -24,6 +27,20 @@ export interface ReturnRequestRow {
   reason: string | null;
   actual_return_time: string | null;
   request_date: string;
+}
+
+export interface StudentReturnStatus {
+  user_id: number;
+  username: string;
+  room_number: number;
+  status: '복귀완료' | '미복귀';
+  return_type: ReturnType | null;
+  actual_return_time: string | null;
+}
+
+export interface FloorReturnStatus {
+  floor: number;
+  students: StudentReturnStatus[];
 }
 
 interface SupaError {
@@ -104,6 +121,8 @@ export class ReturnRequestsService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   private get client(): SupabaseClient {
@@ -271,7 +290,10 @@ export class ReturnRequestsService {
         : existingQuery.eq('return_type', returnType);
 
     const { data: existing, error: findError } = unwrap<{ id: number } | null>(
-      await existingQuery.maybeSingle(),
+      await existingQuery
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     );
 
     if (findError) {
@@ -305,5 +327,64 @@ export class ReturnRequestsService {
     }
 
     return { message: '복귀가 확인되었습니다.', returnType };
+  }
+
+  // GET /admin/returns/today?floor=5 - 오늘 전체 학생 복귀 현황을 층별로 조회.
+  // floor를 안 주면 전체 층을 다 보여줍니다.
+  async getTodayStatusByFloor(floor?: number): Promise<FloorReturnStatus[]> {
+    const students = await this.userRepo.find({
+      relations: { room: true },
+      order: { room: { room_number: 'ASC' } },
+    });
+
+    const filtered = floor
+      ? students.filter((s) => s.room?.floor === floor)
+      : students;
+
+    const { data: todayRows, error } = unwrap<ReturnRequestRow[]>(
+      await this.client
+        .from(RETURN_REQUESTS_TABLE)
+        .select('*')
+        .eq('request_date', today()),
+    );
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    // 학생별로 오늘 기록이 여러 개일 수 있으니(체크인 여러 번), 가장 최근 것(id가 큰 것)만 사용
+    const latestByUserId = new Map<number, ReturnRequestRow>();
+    for (const row of todayRows) {
+      const current = latestByUserId.get(row.user_id);
+      if (!current || row.id > current.id) {
+        latestByUserId.set(row.user_id, row);
+      }
+    }
+
+    const floorMap = new Map<number, StudentReturnStatus[]>();
+    for (const student of filtered) {
+      if (!student.room) continue; // 방 배정 안 된 학생은 층을 알 수 없어 제외
+      const latest = latestByUserId.get(student.id);
+
+      const entry: StudentReturnStatus = {
+        user_id: student.id,
+        username: student.username,
+        room_number: student.room.room_number,
+        status: latest ? '복귀완료' : '미복귀',
+        return_type: latest?.return_type ?? null,
+        actual_return_time: latest?.actual_return_time ?? null,
+      };
+
+      const list = floorMap.get(student.room.floor) ?? [];
+      list.push(entry);
+      floorMap.set(student.room.floor, list);
+    }
+
+    return Array.from(floorMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([floorNo, studentsInFloor]) => ({
+        floor: floorNo,
+        students: studentsInFloor,
+      }));
   }
 }

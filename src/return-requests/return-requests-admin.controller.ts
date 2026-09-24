@@ -1,9 +1,10 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { ReturnRequestsService } from './return-requests.service';
 import { VerifyReturnDto } from './dto/verify-return.dto';
@@ -36,5 +37,27 @@ export class ReturnRequestsAdminController {
   @Post('verify')
   verify(@Body() dto: VerifyReturnDto) {
     return this.returnRequestsService.verifyByAdmin(dto);
+  }
+
+  // GET /admin/returns/today?floor=5
+  @ApiOperation({
+    summary: '오늘 전체 학생 복귀 현황 조회 (층별, 사감 전용)',
+    description:
+      'floor를 주면 그 층 학생만, 안 주면 전체 층을 층별로 묶어서 반환합니다. 각 학생마다 오늘 가장 최근 체크인 기록을 기준으로 복귀완료/미복귀 상태를 보여줍니다.',
+  })
+  @ApiQuery({
+    name: 'floor',
+    required: false,
+    type: Number,
+    description: '조회할 층. 생략하면 전체 층.',
+  })
+  @ApiResponse({ status: 200, description: '조회 성공' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: '관리자만 접근할 수 있음' })
+  @Roles(UserRole.ADMIN)
+  @Get('today')
+  getTodayStatus(@Query('floor') floorQuery: string | undefined) {
+    const floor = floorQuery ? parseInt(floorQuery, 10) : undefined;
+    return this.returnRequestsService.getTodayStatusByFloor(floor);
   }
 }
