@@ -35,6 +35,18 @@ export interface ReturnCheckins {
   IMMEDIATE: string | null;
   DINNER: string | null;
   EIGHT_PM: string | null;
+  // 정해진 복귀 시간대 밖에 찍어 타입이 없는 기록. (20:30 이후 늦은 복귀 등)
+  // 세 칸 어디에도 안 들어가지만 복귀는 복귀라 따로 보여줘야 한다.
+  OTHER: string | null;
+}
+
+// QR을 찍은 학생. 사감 화면에서 얼굴과 대조하는 데 쓴다.
+export interface VerifiedStudent {
+  user_id: number;
+  username: string | null;
+  room_number: number | null;
+  grade: number | null;
+  class_no: number | null;
 }
 
 export interface StudentReturnStatus {
@@ -112,7 +124,7 @@ function resolveReturnTypeByTime(date: Date): ReturnType | null {
 
 // 아무것도 안 찍은 상태의 빈 칸 묶음.
 function emptyCheckins(): ReturnCheckins {
-  return { IMMEDIATE: null, DINNER: null, EIGHT_PM: null };
+  return { IMMEDIATE: null, DINNER: null, EIGHT_PM: null, OTHER: null };
 }
 
 @Injectable()
@@ -252,9 +264,11 @@ export class ReturnRequestsService {
 
   // POST /admin/returns/verify - 사감이 학생 QR을 스캔해서 실제 복귀 확인.
   // 지금 시각이 어느 복귀 타입 시간대에 해당하는지 자동으로 판단해서 저장.
-  async verifyByAdmin(
-    dto: VerifyReturnDto,
-  ): Promise<{ message: string; returnType: ReturnType | null }> {
+  async verifyByAdmin(dto: VerifyReturnDto): Promise<{
+    message: string;
+    returnType: ReturnType | null;
+    student: VerifiedStudent;
+  }> {
     const parts = dto.token.split('.');
     if (parts.length !== 3) {
       throw new BadRequestException('유효하지 않은 QR입니다.');
@@ -340,7 +354,23 @@ export class ReturnRequestsService {
       }
     }
 
-    return { message: '복귀가 확인되었습니다.', returnType };
+    // 사감 화면이 얼굴과 대조할 수 있도록 누가 찍었는지 같이 알려줍니다.
+    const student = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: { room: true },
+    });
+
+    return {
+      message: '복귀가 확인되었습니다.',
+      returnType,
+      student: {
+        user_id: userId,
+        username: student?.username ?? null,
+        room_number: student?.room?.room_number ?? null,
+        grade: student?.grade ?? null,
+        class_no: student?.class_no ?? null,
+      },
+    };
   }
 
   // GET /admin/returns/today?floor=5 - 오늘 전체 학생 복귀 현황을 층별로 조회.
@@ -377,9 +407,9 @@ export class ReturnRequestsService {
     for (const row of todayRows) {
       checkedInUserIds.add(row.user_id);
 
-      if (!row.return_type) continue;
       const slots = checkinsByUserId.get(row.user_id) ?? emptyCheckins();
-      slots[row.return_type] = row.actual_return_time;
+      // 타입이 없으면 OTHER 칸에 담는다. 같은 날 여러 번이면 마지막 것.
+      slots[row.return_type ?? 'OTHER'] = row.actual_return_time;
       checkinsByUserId.set(row.user_id, slots);
     }
 
