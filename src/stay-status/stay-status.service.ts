@@ -85,6 +85,8 @@ export class StayStatusService {
         username: user?.username ?? null,
         room_number: user?.room?.room_number ?? null,
         status: record.status,
+        // 사감이 잔류 학생 보호자에게 연락할 수 있어야 한다.
+        parent_phone: record.parent_phone,
         week_start: record.week_start,
         updated_at: record.updated_at,
       };

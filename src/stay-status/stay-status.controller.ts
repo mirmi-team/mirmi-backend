@@ -42,7 +42,12 @@ export class StayStatusController {
   }
 
   // 관리자 - 주간 전체 학생 현황 조회
-  @ApiOperation({ summary: '주간 전체 학생 잔류/외출 현황 조회 (관리자) 해당 주의 월요일 날짜 입력' })
+  @ApiOperation({
+    summary:
+      '주간 전체 학생 잔류/외출 현황 조회 (관리자) 해당 주의 월요일 날짜 입력',
+    description:
+      'list 에 학생별로 이름·호실·상태·부모님 연락처(parent_phone)가 담깁니다.',
+  })
   @ApiResponse({ status: 200, description: '조회 성공' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
