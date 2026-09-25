@@ -29,13 +29,22 @@ export interface ReturnRequestRow {
   request_date: string;
 }
 
+// 복귀 타입별 체크인 시각. 안 찍었으면 null.
+// 관리자 화면이 '바로복귀 / 석식복귀 / 8시복귀' 세 칸을 각각 표시하는 데 쓴다.
+export interface ReturnCheckins {
+  IMMEDIATE: string | null;
+  DINNER: string | null;
+  EIGHT_PM: string | null;
+}
+
 export interface StudentReturnStatus {
   user_id: number;
   username: string;
   room_number: number;
+  /// 오늘 한 번이라도 찍었으면 복귀완료. 복귀 시간대 밖에 찍은 것도 포함한다.
   status: '복귀완료' | '미복귀';
-  return_type: ReturnType | null;
-  actual_return_time: string | null;
+  /// 오늘 찍은 기록을 타입별로 펼친 것
+  checkins: ReturnCheckins;
 }
 
 export interface FloorReturnStatus {
@@ -99,6 +108,11 @@ function resolveReturnTypeByTime(date: Date): ReturnType | null {
   if (inRange(17, 20, 18, 20)) return ReturnType.DINNER; // 석식 복귀 17:20~18:20
   if (inRange(18, 20, 20, 30)) return ReturnType.EIGHT_PM; // 8시 복귀 18:20~20:30
   return null;
+}
+
+// 아무것도 안 찍은 상태의 빈 칸 묶음.
+function emptyCheckins(): ReturnCheckins {
+  return { IMMEDIATE: null, DINNER: null, EIGHT_PM: null };
 }
 
 @Injectable()
@@ -352,27 +366,33 @@ export class ReturnRequestsService {
       throw new InternalServerErrorException(error.message);
     }
 
-    // 학생별로 오늘 기록이 여러 개일 수 있으니(체크인 여러 번), 가장 최근 것(id가 큰 것)만 사용
-    const latestByUserId = new Map<number, ReturnRequestRow>();
+    // 한 번이라도 찍은 학생. 복귀완료/미복귀는 이것으로 가른다.
+    // (복귀 시간대 밖에 찍어 타입이 없는 기록도 복귀는 복귀다)
+    const checkedInUserIds = new Set<number>();
+
+    // 타입별 체크인 시각. 같은 타입은 행이 새로 생기지 않고 갱신되므로
+    // 타입당 한 건이다.
+    const checkinsByUserId = new Map<number, ReturnCheckins>();
+
     for (const row of todayRows) {
-      const current = latestByUserId.get(row.user_id);
-      if (!current || row.id > current.id) {
-        latestByUserId.set(row.user_id, row);
-      }
+      checkedInUserIds.add(row.user_id);
+
+      if (!row.return_type) continue;
+      const slots = checkinsByUserId.get(row.user_id) ?? emptyCheckins();
+      slots[row.return_type] = row.actual_return_time;
+      checkinsByUserId.set(row.user_id, slots);
     }
 
     const floorMap = new Map<number, StudentReturnStatus[]>();
     for (const student of filtered) {
       if (!student.room) continue; // 방 배정 안 된 학생은 층을 알 수 없어 제외
-      const latest = latestByUserId.get(student.id);
 
       const entry: StudentReturnStatus = {
         user_id: student.id,
         username: student.username,
         room_number: student.room.room_number,
-        status: latest ? '복귀완료' : '미복귀',
-        return_type: latest?.return_type ?? null,
-        actual_return_time: latest?.actual_return_time ?? null,
+        status: checkedInUserIds.has(student.id) ? '복귀완료' : '미복귀',
+        checkins: checkinsByUserId.get(student.id) ?? emptyCheckins(),
       };
 
       const list = floorMap.get(student.room.floor) ?? [];

@@ -43,7 +43,7 @@ export class ReturnRequestsAdminController {
   @ApiOperation({
     summary: '오늘 전체 학생 복귀 현황 조회 (층별, 사감 전용)',
     description:
-      'floor를 주면 그 층 학생만, 안 주면 전체 층을 층별로 묶어서 반환합니다. 각 학생마다 오늘 가장 최근 체크인 기록을 기준으로 복귀완료/미복귀 상태를 보여줍니다.',
+      'floor를 주면 그 층 학생만, 안 주면 전체 층을 층별로 묶어서 반환합니다. 학생마다 checkins 에 바로복귀/석식복귀/8시복귀를 각각 언제 찍었는지(안 찍었으면 null) 담아 주고, 한 번이라도 찍었으면 status 가 복귀완료입니다.',
   })
   @ApiQuery({
     name: 'floor',
