@@ -144,9 +144,11 @@ export class ReturnRequestsService {
     dto: CreateReturnRequestDto,
     userId: number,
   ): Promise<{ message: string; returnId: number }> {
+    // QR 체크인으로 같은 날 행이 여러 개일 수 있으므로 가장 최근 행을 수정한다
     const existing = await this.returnRepo.findOne({
       select: { id: true },
       where: { user_id: userId, request_date: today() },
+      order: { id: 'DESC' },
     });
 
     if (existing) {
