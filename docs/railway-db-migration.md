@@ -2,7 +2,7 @@
 
 Supabase Postgres(싱가포르)를 Railway Postgres(싱가포르)로 옮기는 절차다. Storage는 이번 범위가 아니므로 Supabase Storage를 그대로 쓴다(`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`는 유지).
 
-모든 명령은 Windows PowerShell 기준이다. 비밀번호는 환경변수로만 다루고 명령줄이나 파일에 직접 쓰지 않는다. 각 단계의 `<...>` 값은 직접 채운다.
+모든 명령은 Windows PowerShell 5.1 기준이다. 비밀번호는 환경변수로만 다루고 명령줄이나 파일에 직접 쓰지 않는다. 각 단계의 `<...>` 값은 직접 채운다.
 
 ## 0. 사전 확인 (이전 전에 반드시)
 
@@ -14,7 +14,8 @@ Supabase Postgres(싱가포르)를 Railway Postgres(싱가포르)로 옮기는 �
 
 1. Railway 프로젝트에서 **New → Database → PostgreSQL**을 선택한다.
 2. 서비스 Settings에서 리전이 싱가포르(`asia-southeast1`)인지 확인한다.
-3. Variables 탭에서 다음 값을 확인해 둔다(화면 밖으로 복사하지 않는다).
+3. 로컬에서 복원하려면 외부 접속을 켜야 한다. 서비스 Settings → Networking에서 **Public Networking(TCP Proxy)** 을 활성화한다. 이걸 켜야 Variables에 `DATABASE_PUBLIC_URL`이 생긴다. **이전이 끝나면 다시 끈다**(6단계 마지막 참고).
+4. Variables 탭에서 다음 값을 확인해 둔다(화면 밖으로 복사하지 않는다).
    - 복원용(외부 접속): `DATABASE_PUBLIC_URL`의 호스트, 포트, 사용자, 비밀번호, DB 이름
    - 앱용(내부 접속): `RAILWAY_PRIVATE_DOMAIN`(예: `postgres.railway.internal`), 포트 `5432`
 
@@ -34,21 +35,36 @@ Supabase의 **Connect → Session pooler** 문자열에서 호스트, 포트(543
 $dumpDir = "$HOME\mirmi-dump"
 New-Item -ItemType Directory -Force $dumpDir | Out-Null
 
-# 접속 정보 (비밀번호는 입력 후 화면에 남기지 않는다)
+# 비밀번호 입력 함수 (입력은 화면에 보이지 않고, 변환에 쓴 메모리는 바로 지운다)
+# 이 함수는 이후 단계에서도 같은 PowerShell 창에서 계속 쓴다
+function Read-Secret($prompt) {
+  $secure = Read-Host -AsSecureString $prompt
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try { [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+}
+
+# 접속 정보
 $env:SRC_HOST = "<aws-0-ap-southeast-1.pooler.supabase.com>"
 $env:SRC_PORT = "5432"
 $env:SRC_USER = "postgres.<project-ref>"
 $env:SRC_DB   = "postgres"
-$env:PGPASSWORD = (Read-Host -AsSecureString "Supabase DB 비밀번호" | ConvertFrom-SecureString -AsPlainText)
+$env:PGPASSWORD = Read-Secret "Supabase DB 비밀번호"
 ```
 
-> Windows PowerShell 5.1에서는 `ConvertFrom-SecureString -AsPlainText`를 쓸 수 없다. 5.1이면 `$env:PGPASSWORD = "<비밀번호>"`로 직접 넣고, 작업 후 `Remove-Item Env:PGPASSWORD`로 지운다.
+> `Read-Host -AsSecureString ... | ConvertFrom-SecureString -AsPlainText`는 PowerShell 7 전용이다. Windows PowerShell 5.1에서는 동작하지 않으므로 위의 `Read-Secret` 함수를 쓴다. 작업이 끝나면 `Remove-Item Env:PGPASSWORD`로 지운다.
 
 ```powershell
 # plain SQL 덤프. -f로 컨테이너 안에서 직접 파일을 쓴다(PowerShell의 > 리다이렉트는 UTF-16으로 저장되어 복원이 깨진다)
 docker run --rm -e PGPASSWORD -v "${dumpDir}:/dump" postgres:17 `
   pg_dump -h $env:SRC_HOST -p $env:SRC_PORT -U $env:SRC_USER -d $env:SRC_DB `
   --schema=public --no-owner --no-privileges -f /dump/mirmi.sql
+```
+
+덤프 파일에서 `CREATE SCHEMA public;` 줄을 제거한다. Railway DB에는 `public` 스키마가 이미 있어서, 이 줄이 있으면 복원이 그 지점에서 멈춘다.
+
+```powershell
+docker run --rm -v "${dumpDir}:/dump" postgres:17 sed -i "/^CREATE SCHEMA public;$/d" /dump/mirmi.sql
 ```
 
 덤프에 Supabase 전용 객체가 섞였는지 확인한다.
@@ -67,7 +83,7 @@ $env:DST_HOST = "<DATABASE_PUBLIC_URL의 호스트>"
 $env:DST_PORT = "<DATABASE_PUBLIC_URL의 포트>"
 $env:DST_USER = "postgres"
 $env:DST_DB   = "railway"
-$env:PGPASSWORD = (Read-Host -AsSecureString "Railway DB 비밀번호" | ConvertFrom-SecureString -AsPlainText)
+$env:PGPASSWORD = Read-Secret "Railway DB 비밀번호"
 
 # 빈 DB에만 복원한다. 이미 테이블이 있는 DB에는 실행하지 않는다
 docker run --rm -e PGPASSWORD -v "${dumpDir}:/dump" postgres:17 `
@@ -81,28 +97,34 @@ docker run --rm -e PGPASSWORD -v "${dumpDir}:/dump" postgres:17 `
 
 원본과 대상에서 같은 쿼리를 실행해 결과를 비교한다. 쿼리를 파일로 만든다.
 
+PowerShell 5.1의 `Set-Content -Encoding utf8`은 BOM을 붙여서 psql이 파일 첫 줄을 읽지 못할 수 있다. BOM 없는 UTF-8로 쓴다.
+
 ```powershell
-@'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+$countsSql = @'
 SELECT table_name,
        (xpath('/row/c/text()',
               query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::int AS row_count
 FROM information_schema.tables
 WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
 ORDER BY table_name;
-'@ | Set-Content -Encoding utf8 "$dumpDir\counts.sql"
+'@
+[IO.File]::WriteAllText("$dumpDir\counts.sql", $countsSql, $utf8NoBom)
 
-@'
+$seqSql = @'
 SELECT sequencename, last_value
 FROM pg_sequences
 WHERE schemaname = 'public'
 ORDER BY sequencename;
-'@ | Set-Content -Encoding utf8 "$dumpDir\seq.sql"
+'@
+[IO.File]::WriteAllText("$dumpDir\seq.sql", $seqSql, $utf8NoBom)
 ```
 
 원본(Supabase) 결과를 저장한다.
 
 ```powershell
-$env:PGPASSWORD = (Read-Host -AsSecureString "Supabase DB 비밀번호" | ConvertFrom-SecureString -AsPlainText)
+$env:PGPASSWORD = Read-Secret "Supabase DB 비밀번호"
 foreach ($q in "counts", "seq") {
   docker run --rm -e PGPASSWORD -v "${dumpDir}:/dump" postgres:17 `
     psql -h $env:SRC_HOST -p $env:SRC_PORT -U $env:SRC_USER -d $env:SRC_DB -At -F "|" -f /dump/$q.sql `
@@ -113,7 +135,7 @@ foreach ($q in "counts", "seq") {
 대상(Railway) 결과를 저장한다.
 
 ```powershell
-$env:PGPASSWORD = (Read-Host -AsSecureString "Railway DB 비밀번호" | ConvertFrom-SecureString -AsPlainText)
+$env:PGPASSWORD = Read-Secret "Railway DB 비밀번호"
 foreach ($q in "counts", "seq") {
   docker run --rm -e PGPASSWORD -v "${dumpDir}:/dump" postgres:17 `
     psql -h $env:DST_HOST -p $env:DST_PORT -U $env:DST_USER -d $env:DST_DB -At -F "|" -f /dump/$q.sql `
@@ -132,6 +154,7 @@ foreach ($q in "counts", "seq") {
 - `counts`가 다르면 복원이 불완전한 것이다. 6단계로 넘어가지 않는다.
 - `seq`가 다르면 대상에서 `SELECT setval('<시퀀스명>', <원본 last_value>);`로 맞춘다. 시퀀스가 어긋나면 이후 INSERT가 PK 중복 오류를 낸다.
 - 주의: 비어 있는 테이블의 시퀀스는 `last_value`가 `NULL`로 나오는데 정상이다.
+- 리허설 결과: 테이블별 행 수와 시퀀스 값이 모두 원본과 일치했고, 덤프 파일은 약 45KB였다.
 
 ## 6. 서비스 DB_* 환경변수 교체 후 배포
 
@@ -157,6 +180,8 @@ foreach ($q in "counts", "seq") {
 4. 로그에 DB 연결 오류가 없다.
 
 이상이 없으면 2단계에서 멈춘 쓰기를 재개하고 공지를 해제한다.
+
+마지막으로 **1단계에서 켠 Railway Postgres의 외부 접속(Public Networking, TCP Proxy)을 끈다.** 앱은 내부 주소로 연결하므로 외부 접속이 필요 없고, 열어 두면 DB가 인터넷에 노출된다. 꺼도 `DATABASE_PUBLIC_URL`은 사라지므로, 이후 로컬에서 다시 접속해야 하면 그때 다시 켠다. 정리하면서 로컬의 `$dumpDir`(실제 사용자 데이터가 든 덤프)도 삭제한다.
 
 ## 7. 문제 시 롤백
 
