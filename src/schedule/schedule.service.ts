@@ -37,6 +37,7 @@ export class ScheduleService {
         title: dto.title,
         description: dto.description,
         schedule_date: dto.schedule_date,
+        created_at: new Date().toISOString(),
       }),
     );
 

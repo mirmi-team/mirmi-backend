@@ -1,9 +1,5 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { localDateTimeTransformer } from 'src/common/transformers/local-datetime.transformer';
 
 @Entity('dormitory_schedule')
 export class Schedule {
@@ -20,6 +16,10 @@ export class Schedule {
   @Column({ type: 'date' })
   schedule_date: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
-  created_at: Date;
+  @Column({
+    type: 'timestamp',
+    nullable: true,
+    transformer: localDateTimeTransformer,
+  })
+  created_at: string;
 }

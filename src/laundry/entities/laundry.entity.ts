@@ -1,9 +1,5 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { localDateTimeTransformer } from 'src/common/transformers/local-datetime.transformer';
 import { LaundryMachineStatus } from '../dto/update-laundry.dto';
 
 @Entity('laundry')
@@ -17,6 +13,6 @@ export class Laundry {
   @Column()
   floor: number;
 
-  @CreateDateColumn({ type: 'timestamptz' })
-  created_at: Date;
+  @Column({ type: 'timestamp', transformer: localDateTimeTransformer })
+  created_at: string;
 }
