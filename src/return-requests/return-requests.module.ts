@@ -3,11 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReturnRequestsService } from './return-requests.service';
 import { ReturnRequestsController } from './return-requests.controller';
 import { ReturnRequestsAdminController } from './return-requests-admin.controller';
-import { SupabaseModule } from 'src/common/supabase/supabase.module';
 import { User } from 'src/users/entities/user.entity';
+import { ReturnRequest } from './entities/return-request.entity';
 
 @Module({
-  imports: [SupabaseModule, TypeOrmModule.forFeature([User])],
+  imports: [TypeOrmModule.forFeature([User, ReturnRequest])],
   controllers: [ReturnRequestsController, ReturnRequestsAdminController],
   providers: [ReturnRequestsService],
   exports: [ReturnRequestsService],
