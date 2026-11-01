@@ -20,7 +20,7 @@ export class MeritLog {
   @Column()
   user_id: number;
 
-  @Column({ type: 'enum', enum: MeritType })
+  @Column({ type: 'enum', enum: MeritType, enumName: 'merit_type' })
   type: MeritType;
 
   @Column()

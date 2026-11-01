@@ -7,7 +7,11 @@ export class Laundry {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar' })
+  @Column({
+    type: 'enum',
+    enum: LaundryMachineStatus,
+    enumName: 'laundry_status',
+  })
   status: LaundryMachineStatus;
 
   @Column()

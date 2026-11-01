@@ -10,7 +10,12 @@ export class ReturnRequest {
   @Column()
   user_id: number;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({
+    type: 'enum',
+    enum: ReturnType,
+    enumName: 'return_type_enum',
+    nullable: true,
+  })
   return_type: ReturnType | null;
 
   @Column({ type: 'varchar', nullable: true })

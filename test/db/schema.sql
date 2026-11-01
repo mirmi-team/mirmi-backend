@@ -2,19 +2,19 @@
 -- 운영 DB에는 적용하지 않는다.
 -- 시간 컬럼은 운영과 같이 대부분 timestamp without time zone이다.
 
--- enum 이름은 운영 조회 결과에 나온 것(user_role, cleaning_status, laundry_status)만 확정이다.
--- merit/suggestion enum 이름은 엔티티 기준, return_type/reservation_status 이름은 추정이다.
+-- enum 이름과 값은 운영 DB 값과 같다.
 CREATE TYPE user_role AS ENUM ('STUDENT', 'ADMIN');
-CREATE TYPE users_gender_enum AS ENUM ('MALE', 'FEMALE');
-CREATE TYPE merit_logs_type_enum AS ENUM ('PENALTY', 'REWARD');
-CREATE TYPE merit_reasons_type_enum AS ENUM ('PENALTY', 'REWARD');
+CREATE TYPE gender_type AS ENUM ('MALE', 'FEMALE');
+CREATE TYPE merit_type AS ENUM ('PENALTY', 'REWARD');
 CREATE TYPE suggestion_category AS ENUM (
   'FACILITY', 'OPERATION', 'MEAL', 'CLEANING', 'SAFETY', 'NOISE', 'ETC'
 );
 CREATE TYPE cleaning_status AS ENUM ('PENDING', 'DONE');
 CREATE TYPE laundry_status AS ENUM ('AVAILABLE', 'BROKEN');
-CREATE TYPE reservation_status AS ENUM ('PENDING', 'IN_USE', 'DONE', 'CANCELED');
-CREATE TYPE return_type AS ENUM ('IMMEDIATE', 'DINNER', 'EIGHT_PM');
+CREATE TYPE laundry_request_status AS ENUM ('IN_USE', 'DONE', 'CANCELED', 'PENDING');
+CREATE TYPE return_type_enum AS ENUM ('IMMEDIATE', 'DINNER', 'EIGHT_PM');
+-- theme은 운영에 존재하지만 어느 테이블이 쓰는지 확인되지 않았고 코드에서도 쓰지 않는다. 타입만 둔다.
+CREATE TYPE theme AS ENUM ('DARK', 'LIGHT');
 
 CREATE TABLE rooms (
   id SERIAL PRIMARY KEY,
@@ -33,11 +33,10 @@ CREATE TABLE users (
   role user_role NOT NULL DEFAULT 'STUDENT',
   can_staying BOOLEAN NOT NULL DEFAULT false,
   total_merit_score INTEGER NOT NULL DEFAULT 0,
-  -- 아래 컬럼들은 운영 조회 결과가 잘려 확인하지 못했다. 엔티티 기준.
   password VARCHAR NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   profile_image VARCHAR,
-  gender users_gender_enum
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  gender gender_type
 );
 
 CREATE TABLE email_verifications (
@@ -62,7 +61,7 @@ CREATE TABLE refresh_tokens (
 CREATE TABLE merit_logs (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  type merit_logs_type_enum NOT NULL,
+  type merit_type NOT NULL,
   score INTEGER NOT NULL,
   reason VARCHAR NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -70,7 +69,7 @@ CREATE TABLE merit_logs (
 
 CREATE TABLE merit_reasons (
   id SERIAL PRIMARY KEY,
-  type merit_reasons_type_enum NOT NULL,
+  type merit_type NOT NULL,
   reason VARCHAR NOT NULL,
   default_score INTEGER NOT NULL
 );
@@ -126,7 +125,7 @@ CREATE TABLE laundry_request (
   room_number INTEGER NOT NULL,
   start_time TIMESTAMP NOT NULL,
   end_time TIMESTAMP NOT NULL,
-  status reservation_status NOT NULL,
+  status laundry_request_status NOT NULL,
   laundry_id INTEGER NOT NULL
 );
 
@@ -159,7 +158,7 @@ CREATE TABLE dormitory_schedule (
 CREATE TABLE return_requests (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  return_type return_type,
+  return_type return_type_enum,
   reason VARCHAR,
   actual_return_time TIMESTAMP,
   request_date DATE NOT NULL DEFAULT CURRENT_DATE

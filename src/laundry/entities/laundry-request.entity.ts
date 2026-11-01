@@ -22,6 +22,10 @@ export class LaundryRequest {
   @Column({ type: 'timestamp', transformer: localDateTimeTransformer })
   end_time: string;
 
-  @Column({ type: 'varchar' })
+  @Column({
+    type: 'enum',
+    enum: ReservationStatus,
+    enumName: 'laundry_request_status',
+  })
   status: ReservationStatus;
 }

@@ -7,7 +7,7 @@ export class MeritReason {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'enum', enum: MeritType })
+  @Column({ type: 'enum', enum: MeritType, enumName: 'merit_type' })
   type: MeritType;
 
   @Column()

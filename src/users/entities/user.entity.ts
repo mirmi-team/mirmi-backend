@@ -25,10 +25,10 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column({ type: 'varchar', unique: true })
   email: string;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar' })
   username: string;
 
   @Column()
@@ -37,6 +37,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
+    enumName: 'user_role',
     default: UserRole.STUDENT,
   })
   role: UserRole;
@@ -47,27 +48,29 @@ export class User {
   @Column({ default: 0 })
   total_merit_score: number;
 
-  @Column()
+  @Column({ type: 'varchar' })
   password: string;
 
-  @CreateDateColumn()
+  // 운영 DB: timestamp without time zone, NULL 허용, default CURRENT_TIMESTAMP
+  @CreateDateColumn({ type: 'timestamp', nullable: true })
   created_at: Date;
 
-  @Column()
-  grade: number;
+  @Column({ type: 'int', nullable: true })
+  grade: number | null;
 
-  @Column()
-  class_no: number;
+  @Column({ type: 'int', nullable: true })
+  class_no: number | null;
 
-  @Column({ nullable: true })
-  profile_image: string;
+  @Column({ type: 'varchar', nullable: true })
+  profile_image: string | null;
 
   @Column({
     type: 'enum',
     enum: Gender,
+    enumName: 'gender_type',
     nullable: true,
   })
-  gender: Gender;
+  gender: Gender | null;
 
   @ManyToOne(() => Room)
   @JoinColumn({ name: 'room_id' })

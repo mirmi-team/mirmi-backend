@@ -23,6 +23,11 @@ export class CleaningDuty {
   @Column({ type: 'timestamp', transformer: localDateTimeTransformer })
   duty_date: string;
 
-  @Column({ type: 'varchar' })
+  @Column({
+    type: 'enum',
+    enum: ['PENDING', 'DONE'],
+    enumName: 'cleaning_status',
+    default: 'PENDING',
+  })
   status: string;
 }
