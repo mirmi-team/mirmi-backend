@@ -6,10 +6,9 @@ Supabase Postgres(싱가포르)를 Railway Postgres(싱가포르)로 옮기는 �
 
 ## 0. 사전 확인 (이전 전에 반드시)
 
-1. **`return-requests` 모듈은 아직 Supabase PostgREST(`client.from(...)`)로 DB에 접근한다.** DB를 옮기면 이 모듈이 동작하지 않는다. 이전 전에 TypeORM으로 전환하거나, 전환 전까지 이전을 미룬다.
-2. 이 브랜치 코드는 SSL을 `DB_SSL=true`일 때만 켠다. **Supabase에 연결된 현재 운영 서비스에 `DB_SSL=true`를 먼저 추가한 뒤 배포한다.** 빠뜨리면 배포 직후 Supabase 연결이 끊긴다.
-3. 코드 배포(laundry, schedule, cleaning-duty의 TypeORM 전환)는 DB 이전과 분리해서 먼저 한다. 아직 Supabase DB를 보는 상태에서 세탁/일정/청소 API가 정상인지 확인한 뒤 이전을 시작한다.
-4. 로컬에 Docker Desktop이 실행 중이어야 한다.
+1. 이 브랜치 코드는 SSL을 `DB_SSL=true`일 때만 켠다. **Supabase에 연결된 현재 운영 서비스에 `DB_SSL=true`를 먼저 추가한 뒤 배포한다.** 빠뜨리면 배포 직후 Supabase 연결이 끊긴다.
+2. 코드 배포(laundry, schedule, cleaning-duty, return-requests의 TypeORM 전환)는 DB 이전과 분리해서 먼저 한다. 아직 Supabase DB를 보는 상태에서 세탁/일정/청소/복귀 API가 정상인지 확인한 뒤 이전을 시작한다.
+3. 로컬에 Docker Desktop이 실행 중이어야 한다.
 
 ## 1. Railway에서 Postgres 서비스 생성
 
