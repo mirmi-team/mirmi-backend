@@ -1,14 +1,9 @@
-import {
-  Injectable,
-  BadRequestException,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseService } from 'src/common/supabase/supabase.service';
+import { IsNull, Repository } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
+import { ReturnRequest } from './entities/return-request.entity';
 import { createHmac, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
 import {
@@ -17,17 +12,7 @@ import {
 } from './dto/create-return-request.dto';
 import { VerifyReturnDto } from './dto/verify-return.dto';
 
-const RETURN_REQUESTS_TABLE = 'return_requests';
 const QR_TOKEN_TTL_MS = 30 * 1000; // 30초
-
-export interface ReturnRequestRow {
-  id: number;
-  user_id: number;
-  return_type: ReturnType | null;
-  reason: string | null;
-  actual_return_time: string | null;
-  request_date: string;
-}
 
 // 복귀 타입별 체크인 시각. 안 찍었으면 null.
 // 관리자 화면이 '바로복귀 / 석식복귀 / 8시복귀' 세 칸을 각각 표시하는 데 쓴다.
@@ -62,21 +47,6 @@ export interface StudentReturnStatus {
 export interface FloorReturnStatus {
   floor: number;
   students: StudentReturnStatus[];
-}
-
-interface SupaError {
-  message: string;
-}
-
-interface SupaResult<T> {
-  data: T;
-  error: SupaError | null;
-}
-
-// Supabase 클라이언트가 Database 타입 생성 없이 쓰이고 있어 응답이 전부 any로 잡힙니다.
-// 구조분해하기 전에 unknown을 거쳐 먼저 SupaResult<T>로 확정 짓고 나서 구조분해합니다.
-function unwrap<T>(result: unknown): SupaResult<T> {
-  return result as SupaResult<T>;
 }
 
 function today(): string {
@@ -145,15 +115,12 @@ export class ReturnRequestsService {
   }
 
   constructor(
-    private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(ReturnRequest)
+    private readonly returnRepo: Repository<ReturnRequest>,
   ) {}
-
-  private get client(): SupabaseClient {
-    return this.supabaseService.client as SupabaseClient;
-  }
 
   // 학생 QR 서명에 쓰는 비밀키. 로그인 토큰과 같은 값을 재사용합니다.
   private get qrSecret(): string {
@@ -165,20 +132,11 @@ export class ReturnRequestsService {
   }
 
   // GET /returns - 로그인한 본인의 오늘 복귀 기록 전체 (체크인마다 행이 쌓이므로 배열)
-  async findMine(userId: number): Promise<ReturnRequestRow[]> {
-    const { data, error } = unwrap<ReturnRequestRow[]>(
-      await this.client
-        .from(RETURN_REQUESTS_TABLE)
-        .select('*')
-        .eq('user_id', userId)
-        .eq('request_date', today())
-        .order('id', { ascending: true }),
-    );
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-    return data;
+  async findMine(userId: number): Promise<ReturnRequest[]> {
+    return this.returnRepo.find({
+      where: { user_id: userId, request_date: today() },
+      order: { id: 'ASC' },
+    });
   }
 
   // POST /returns - 오늘 복귀 예정 시간 사전 등록/수정 (참고용. 실제 타입은 QR 체크인 때 자동 결정됨)
@@ -186,33 +144,18 @@ export class ReturnRequestsService {
     dto: CreateReturnRequestDto,
     userId: number,
   ): Promise<{ message: string; returnId: number }> {
-    const { data: existing, error: findError } = unwrap<{ id: number } | null>(
-      await this.client
-        .from(RETURN_REQUESTS_TABLE)
-        .select('id')
-        .eq('user_id', userId)
-        .eq('request_date', today())
-        .maybeSingle(),
-    );
-
-    if (findError) {
-      throw new InternalServerErrorException(findError.message);
-    }
+    // QR 체크인으로 같은 날 행이 여러 개일 수 있으므로 가장 최근 행을 수정한다
+    const existing = await this.returnRepo.findOne({
+      select: { id: true },
+      where: { user_id: userId, request_date: today() },
+      order: { id: 'DESC' },
+    });
 
     if (existing) {
-      const { error } = unwrap<null>(
-        await this.client
-          .from(RETURN_REQUESTS_TABLE)
-          .update({
-            return_type: dto.return_type,
-            reason: dto.reason ?? null,
-          })
-          .eq('id', existing.id),
-      );
-
-      if (error) {
-        throw new InternalServerErrorException(error.message);
-      }
+      await this.returnRepo.update(existing.id, {
+        return_type: dto.return_type,
+        reason: dto.reason ?? null,
+      });
 
       return {
         message: '복귀 시간이 수정되었습니다.',
@@ -220,22 +163,14 @@ export class ReturnRequestsService {
       };
     }
 
-    const { data: inserted, error } = unwrap<{ id: number }>(
-      await this.client
-        .from(RETURN_REQUESTS_TABLE)
-        .insert({
-          user_id: userId,
-          return_type: dto.return_type,
-          reason: dto.reason ?? null,
-          request_date: today(),
-        })
-        .select('id')
-        .single(),
+    const inserted = await this.returnRepo.save(
+      this.returnRepo.create({
+        user_id: userId,
+        return_type: dto.return_type,
+        reason: dto.reason ?? null,
+        request_date: today(),
+      }),
     );
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
 
     return {
       message: '복귀 시간이 등록되었습니다.',
@@ -307,51 +242,29 @@ export class ReturnRequestsService {
 
     // 오늘 이미 같은 return_type으로 체크인한 기록이 있으면 그 행의 시각만
     // 갱신하고, 없으면(처음이거나 이전과 다른 타입이면) 새 행을 추가합니다.
-    let existingQuery = this.client
-      .from(RETURN_REQUESTS_TABLE)
-      .select('id')
-      .eq('user_id', userId)
-      .eq('request_date', today());
-    existingQuery =
-      returnType == null
-        ? existingQuery.is('return_type', null)
-        : existingQuery.eq('return_type', returnType);
-
-    const { data: existing, error: findError } = unwrap<{ id: number } | null>(
-      await existingQuery
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    );
-
-    if (findError) {
-      throw new InternalServerErrorException(findError.message);
-    }
+    const existing = await this.returnRepo.findOne({
+      select: { id: true },
+      where: {
+        user_id: userId,
+        request_date: today(),
+        return_type: returnType ?? IsNull(),
+      },
+      order: { id: 'DESC' },
+    });
 
     if (existing) {
-      const { error } = unwrap<null>(
-        await this.client
-          .from(RETURN_REQUESTS_TABLE)
-          .update({ actual_return_time: new Date().toISOString() })
-          .eq('id', existing.id),
-      );
-
-      if (error) {
-        throw new InternalServerErrorException(error.message);
-      }
+      await this.returnRepo.update(existing.id, {
+        actual_return_time: new Date().toISOString(),
+      });
     } else {
-      const { error } = unwrap<null>(
-        await this.client.from(RETURN_REQUESTS_TABLE).insert({
+      await this.returnRepo.save(
+        this.returnRepo.create({
           user_id: userId,
           request_date: today(),
           actual_return_time: new Date().toISOString(),
           return_type: returnType,
         }),
       );
-
-      if (error) {
-        throw new InternalServerErrorException(error.message);
-      }
     }
 
     // 사감 화면이 얼굴과 대조할 수 있도록 누가 찍었는지 같이 알려줍니다.
@@ -385,16 +298,9 @@ export class ReturnRequestsService {
       ? students.filter((s) => s.room?.floor === floor)
       : students;
 
-    const { data: todayRows, error } = unwrap<ReturnRequestRow[]>(
-      await this.client
-        .from(RETURN_REQUESTS_TABLE)
-        .select('*')
-        .eq('request_date', today()),
-    );
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
+    const todayRows = await this.returnRepo.find({
+      where: { request_date: today() },
+    });
 
     // 한 번이라도 찍은 학생. 복귀완료/미복귀는 이것으로 가른다.
     // (복귀 시간대 밖에 찍어 타입이 없는 기록도 복귀는 복귀다)

@@ -4,52 +4,15 @@ import {
   ConflictException,
   ForbiddenException,
   BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseService } from 'src/common/supabase/supabase.service';
 import { User } from 'src/users/entities/user.entity';
-import {
-  UpdateLaundryDto,
-  LaundryMachineStatus,
-} from './dto/update-laundry.dto';
+import { UpdateLaundryDto } from './dto/update-laundry.dto';
 import { CreateLaundryDto, ReservationStatus } from './dto/create-laundry.dto';
-
-const MACHINES_TABLE = 'laundry';
-const RESERVATIONS_TABLE = 'laundry_request';
-const SCHEDULE_TABLE = 'laundry_fixed_schedule';
-
-export interface LaundryMachineRow {
-  id: number;
-  status: LaundryMachineStatus;
-  floor: number;
-  created_at: string;
-}
-
-export interface LaundryReservationRow {
-  id: number;
-  laundry_id: number;
-  user_id: number;
-  room_number: number;
-  start_time: string;
-  end_time: string;
-  status: ReservationStatus;
-}
-
-interface FixedScheduleRow {
-  id: number;
-  floor: number;
-  day_of_week: string;
-  machine_no: number;
-  start_time: string; // 'HH:MM:SS'
-  end_time: string;
-  assigned_room: number | null;
-  // 슬롯 하나에 호실 2개가 배정되는 경우(둘이 순서를 합의해서 쓰는 경우)를 위한 필드.
-  // 단독 배정이면 null.
-  assigned_room_2: number | null;
-}
+import { Laundry } from './entities/laundry.entity';
+import { LaundryRequest } from './entities/laundry-request.entity';
+import { LaundryFixedSchedule } from './entities/laundry-fixed-schedule.entity';
 
 export type ScheduleSlot = {
   machine_no: number;
@@ -60,13 +23,6 @@ export type ScheduleSlot = {
   // FIXED 슬롯에 호실이 2개 배정된 경우에만 값이 있음 (그 외엔 null)
   room_number_2: number | null;
 };
-
-// Supabase 클라이언트가 Database 타입 생성 없이 쓰이고 있어 응답이 전부 any로 잡힙니다.
-// unknown을 거쳐 명시적으로 캐스팅하는 이 함수 경계를 통과시키면, 호출부에서는
-// any가 아니라 T 타입으로 확정되어 no-unsafe-* 계열 eslint 규칙에 걸리지 않습니다.
-function asRows<T>(value: unknown): T {
-  return value as T;
-}
 
 const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
 
@@ -79,14 +35,15 @@ function resolveDayCode(dateStr: string): string {
 @Injectable()
 export class LaundryService {
   constructor(
-    private readonly supabaseService: SupabaseService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Laundry)
+    private readonly laundryRepo: Repository<Laundry>,
+    @InjectRepository(LaundryRequest)
+    private readonly requestRepo: Repository<LaundryRequest>,
+    @InjectRepository(LaundryFixedSchedule)
+    private readonly fixedScheduleRepo: Repository<LaundryFixedSchedule>,
   ) {}
-
-  private get client(): SupabaseClient {
-    return this.supabaseService.client as SupabaseClient;
-  }
 
   // 로그인한 유저의 방(room)을 통해 그 유저가 생활 중인 층을 조회
   async getUserFloor(userId: number): Promise<number> {
@@ -109,31 +66,20 @@ export class LaundryService {
   private async getFloorMachines(
     floor: number,
   ): Promise<{ id: number; machine_no: number }[]> {
-    const { data, error } = await this.client
-      .from(MACHINES_TABLE)
-      .select('id')
-      .eq('floor', floor)
-      .order('id', { ascending: true });
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-    const machines = asRows<{ id: number }[]>(data);
+    const machines = await this.laundryRepo.find({
+      select: { id: true },
+      where: { floor },
+      order: { id: 'ASC' },
+    });
     return machines.map((m, index) => ({ id: m.id, machine_no: index + 1 }));
   }
 
   // GET /laundry?floor=5 (floor 없으면 컨트롤러에서 로그인 유저의 층으로 채워서 넘겨줌)
-  async findAllMachines(floor: number): Promise<LaundryMachineRow[]> {
-    const { data, error } = await this.client
-      .from(MACHINES_TABLE)
-      .select('*')
-      .eq('floor', floor)
-      .order('id', { ascending: true });
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-    return asRows<LaundryMachineRow[]>(data);
+  async findAllMachines(floor: number): Promise<Laundry[]> {
+    return this.laundryRepo.find({
+      where: { floor },
+      order: { id: 'ASC' },
+    });
   }
 
   // GET /laundry/schedule?date=YYYY-MM-DD&floor=5
@@ -146,32 +92,22 @@ export class LaundryService {
     );
     const laundryIds = floorMachines.map((m) => m.id);
 
-    const { data: slotsData, error: slotError } = await this.client
-      .from(SCHEDULE_TABLE)
-      .select('*')
-      .eq('floor', floor)
-      .eq('day_of_week', dayCode)
-      .order('start_time', { ascending: true });
+    const slots = await this.fixedScheduleRepo.find({
+      where: { floor, day_of_week: dayCode },
+      order: { start_time: 'ASC' },
+    });
 
-    if (slotError) {
-      throw new InternalServerErrorException(slotError.message);
-    }
-    const slots = asRows<FixedScheduleRow[]>(slotsData);
-
-    let reservations: LaundryReservationRow[] = [];
+    let reservations: LaundryRequest[] = [];
     if (laundryIds.length > 0) {
-      const { data: resData, error: resError } = await this.client
-        .from(RESERVATIONS_TABLE)
-        .select('*')
-        .in('laundry_id', laundryIds)
-        .in('status', [ReservationStatus.PENDING, ReservationStatus.IN_USE])
-        .gte('start_time', `${dateStr}T00:00:00`)
-        .lt('start_time', `${dateStr}T23:59:59`);
-
-      if (resError) {
-        throw new InternalServerErrorException(resError.message);
-      }
-      reservations = asRows<LaundryReservationRow[]>(resData);
+      reservations = await this.requestRepo
+        .createQueryBuilder('r')
+        .where('r.laundry_id IN (:...laundryIds)', { laundryIds })
+        .andWhere('r.status IN (:...statuses)', {
+          statuses: [ReservationStatus.PENDING, ReservationStatus.IN_USE],
+        })
+        .andWhere('r.start_time >= :from', { from: `${dateStr}T00:00:00` })
+        .andWhere('r.start_time < :to', { to: `${dateStr}T23:59:59` })
+        .getMany();
     }
 
     return slots.map((slot) => {
@@ -210,27 +146,15 @@ export class LaundryService {
     id: number,
     dto: UpdateLaundryDto,
   ): Promise<{ message: string }> {
-    const { data: machine, error: findError } = await this.client
-      .from(MACHINES_TABLE)
-      .select('id')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (findError) {
-      throw new InternalServerErrorException(findError.message);
-    }
+    const machine = await this.laundryRepo.findOne({
+      select: { id: true },
+      where: { id },
+    });
     if (!machine) {
       throw new NotFoundException('해당 세탁기를 찾을 수 없습니다.');
     }
 
-    const { error } = await this.client
-      .from(MACHINES_TABLE)
-      .update({ status: dto.status })
-      .eq('id', id);
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
+    await this.laundryRepo.update(id, { status: dto.status });
 
     return { message: '세탁기 상태가 변경되었습니다.' };
   }
@@ -240,16 +164,10 @@ export class LaundryService {
     dto: CreateLaundryDto,
     userId: number,
   ): Promise<{ message: string; reservationId: number }> {
-    const { data: machineData, error: machineError } = await this.client
-      .from(MACHINES_TABLE)
-      .select('id, floor')
-      .eq('id', dto.laundry_id)
-      .maybeSingle();
-
-    if (machineError) {
-      throw new InternalServerErrorException(machineError.message);
-    }
-    const machine = asRows<{ id: number; floor: number } | null>(machineData);
+    const machine = await this.laundryRepo.findOne({
+      select: { id: true, floor: true },
+      where: { id: dto.laundry_id },
+    });
     if (!machine) {
       throw new NotFoundException('해당 세탁기를 찾을 수 없습니다.');
     }
@@ -270,20 +188,19 @@ export class LaundryService {
     const endHHMM = dto.end_time.slice(11, 16);
     const dayCode = resolveDayCode(startDate);
 
-    const { data: slotData, error: slotError } = await this.client
-      .from(SCHEDULE_TABLE)
-      .select('*')
-      .eq('floor', machine.floor)
-      .eq('day_of_week', dayCode)
-      .eq('machine_no', machineNo)
-      .eq('start_time', `${startHHMM}:00`)
-      .eq('end_time', `${endHHMM}:00`)
-      .maybeSingle();
-
-    if (slotError) {
-      throw new InternalServerErrorException(slotError.message);
-    }
-    const slot = asRows<FixedScheduleRow | null>(slotData);
+    // machineNo가 undefined면 TypeORM where가 조건을 무시하므로 먼저 걸러낸다
+    const slot =
+      machineNo === undefined
+        ? null
+        : await this.fixedScheduleRepo.findOne({
+            where: {
+              floor: machine.floor,
+              day_of_week: dayCode,
+              machine_no: machineNo,
+              start_time: `${startHHMM}:00`,
+              end_time: `${endHHMM}:00`,
+            },
+          });
 
     if (!slot) {
       throw new BadRequestException(
@@ -303,59 +220,45 @@ export class LaundryService {
     }
 
     // 같은 세탁기에 시간이 겹치는 예약이 있는지 확인 (대기중/사용중인 예약만 대상)
-    const { data: overlapping, error: overlapError } = await this.client
-      .from(RESERVATIONS_TABLE)
-      .select('id')
-      .eq('laundry_id', dto.laundry_id)
-      .in('status', [ReservationStatus.PENDING, ReservationStatus.IN_USE])
-      .lt('start_time', dto.end_time)
-      .gt('end_time', dto.start_time)
-      .limit(1);
+    const overlapping = await this.requestRepo
+      .createQueryBuilder('r')
+      .select('r.id')
+      .where('r.laundry_id = :laundryId', { laundryId: dto.laundry_id })
+      .andWhere('r.status IN (:...statuses)', {
+        statuses: [ReservationStatus.PENDING, ReservationStatus.IN_USE],
+      })
+      .andWhere('r.start_time < :end', { end: dto.end_time })
+      .andWhere('r.end_time > :start', { start: dto.start_time })
+      .limit(1)
+      .getMany();
 
-    if (overlapError) {
-      throw new InternalServerErrorException(overlapError.message);
-    }
-    if (overlapping && overlapping.length > 0) {
+    if (overlapping.length > 0) {
       throw new ConflictException('해당 시간에 이미 예약이 존재합니다.');
     }
 
-    const { data: inserted, error } = await this.client
-      .from(RESERVATIONS_TABLE)
-      .insert({
+    const inserted = await this.requestRepo.save(
+      this.requestRepo.create({
         laundry_id: dto.laundry_id,
         room_number: dto.room_number,
         start_time: dto.start_time,
         end_time: dto.end_time,
         status: ReservationStatus.PENDING, // 클라이언트 값 무시, 서버에서 고정
         user_id: userId,
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-
-    const insertedRow = asRows<{ id: number }>(inserted);
+      }),
+    );
 
     return {
       message: '세탁 신청이 완료되었습니다.',
-      reservationId: insertedRow.id,
+      reservationId: inserted.id,
     };
   }
 
   // GET /laundry/requests/me
-  async findMyReservations(userId: number): Promise<LaundryReservationRow[]> {
-    const { data, error } = await this.client
-      .from(RESERVATIONS_TABLE)
-      .select('*')
-      .eq('user_id', userId)
-      .order('start_time', { ascending: true });
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-    return asRows<LaundryReservationRow[]>(data);
+  async findMyReservations(userId: number): Promise<LaundryRequest[]> {
+    return this.requestRepo.find({
+      where: { user_id: userId },
+      order: { start_time: 'ASC' },
+    });
   }
 
   // DELETE /laundry/reservations/:id
@@ -363,15 +266,10 @@ export class LaundryService {
     id: number,
     userId: number,
   ): Promise<{ message: string }> {
-    const { data: reservation, error: findError } = await this.client
-      .from(RESERVATIONS_TABLE)
-      .select('id, user_id')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (findError) {
-      throw new InternalServerErrorException(findError.message);
-    }
+    const reservation = await this.requestRepo.findOne({
+      select: { id: true, user_id: true },
+      where: { id },
+    });
     if (!reservation) {
       throw new NotFoundException('해당 세탁 신청을 찾을 수 없습니다.');
     }
@@ -379,14 +277,7 @@ export class LaundryService {
       throw new ForbiddenException('본인의 신청만 취소할 수 있습니다.');
     }
 
-    const { error } = await this.client
-      .from(RESERVATIONS_TABLE)
-      .update({ status: ReservationStatus.CANCELED })
-      .eq('id', id);
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
+    await this.requestRepo.update(id, { status: ReservationStatus.CANCELED });
 
     return { message: '세탁 신청이 취소되었습니다.' };
   }

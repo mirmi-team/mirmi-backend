@@ -3,11 +3,15 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { DateFormatInterceptor } from './common/interceptors/date-format.interceptor';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
-  app.useGlobalInterceptors(new DateFormatInterceptor());
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new DateFormatInterceptor(),
+  );
 
   // Swagger 설정
   const config = new DocumentBuilder()

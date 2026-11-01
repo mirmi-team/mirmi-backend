@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { CleaningDutyService } from './cleaning-duty.service';
 import { CleaningDutyController } from './cleaning-duty.controller';
-import { SupabaseModule } from 'src/common/supabase/supabase.module';
+import { CleaningDuty } from './entities/cleaning-duty.entity';
 
 @Module({
-  imports: [SupabaseModule],
+  imports: [TypeOrmModule.forFeature([CleaningDuty])],
   controllers: [CleaningDutyController],
   providers: [CleaningDutyService],
   exports: [CleaningDutyService],

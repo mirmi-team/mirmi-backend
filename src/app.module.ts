@@ -13,10 +13,31 @@ import { StayStatusModule } from './stay-status/stay-status.module';
 import { MeritLogsModule } from './merit-logs/merit-logs.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { RoomsModule } from './rooms/rooms.module';
 import { SupabaseModule } from './common/supabase/supabase.module';
 import { ContactModule } from './contact/contact.module';
+
+// Railway 내부 주소는 SSL이 필요 없으므로 DB_SSL=true일 때만 SSL을 사용한다
+function buildTypeOrmOptions(): TypeOrmModuleOptions {
+  return {
+    type: 'postgres',
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    username: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    entities: [__dirname + '/**/*.entity{.ts,.js}'],
+    synchronize: false,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    extra: {
+      max: Number(process.env.DB_POOL_MAX ?? 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+      keepAlive: true,
+    },
+  };
+}
 
 @Module({
   imports: [
@@ -35,17 +56,7 @@ import { ContactModule } from './contact/contact.module';
     ContactModule,
     ConfigModule.forRoot({ isGlobal: true }),
     SupabaseModule,
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT),
-      username: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: false,
-      ssl: { rejectUnauthorized: false },
-    }),
+    TypeOrmModule.forRoot(buildTypeOrmOptions()),
   ],
   controllers: [AppController],
   providers: [AppService],
