@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleService } from './schedule.service';
 import { ScheduleController } from './schedule.controller';
 import { ScheduleAdminController } from './schedule-admin.controller';
-import { SupabaseModule } from 'src/common/supabase/supabase.module';
+import { Schedule } from './entities/schedule.entity';
 
 @Module({
-  imports: [SupabaseModule],
+  imports: [TypeOrmModule.forFeature([Schedule])],
   controllers: [ScheduleController, ScheduleAdminController],
   providers: [ScheduleService],
   exports: [ScheduleService],
