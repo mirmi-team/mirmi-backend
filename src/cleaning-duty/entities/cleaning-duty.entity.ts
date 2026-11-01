@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Room } from 'src/rooms/entities/room.entity';
+import { localDateTimeTransformer } from 'src/common/transformers/local-datetime.transformer';
 
 @Entity('cleaning_duty')
 export class CleaningDuty {
@@ -19,8 +20,8 @@ export class CleaningDuty {
   @JoinColumn({ name: 'room_id' })
   room: Room | null;
 
-  @Column({ type: 'timestamp' })
-  duty_date: Date;
+  @Column({ type: 'timestamp', transformer: localDateTimeTransformer })
+  duty_date: string;
 
   @Column({ type: 'varchar' })
   status: string;

@@ -6,7 +6,7 @@ import { CleaningDuty } from './entities/cleaning-duty.entity';
 export interface CleaningDutyRow {
   id: number;
   room_number: number | null;
-  duty_date: Date;
+  duty_date: string;
   status: string;
 }
 
@@ -19,8 +19,8 @@ export class CleaningDutyService {
 
   // GET /cleanings?duty_date=2026-05-14
   async findAll(dutyDate: string): Promise<CleaningDutyRow[]> {
-    const startOfDay = new Date(`${dutyDate}T00:00:00`);
-    const endOfDay = new Date(`${dutyDate}T23:59:59`);
+    const startOfDay = `${dutyDate}T00:00:00`;
+    const endOfDay = `${dutyDate}T23:59:59`;
 
     const duties = await this.cleaningDutyRepository.find({
       where: { duty_date: Between(startOfDay, endOfDay) },
