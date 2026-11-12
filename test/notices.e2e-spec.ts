@@ -76,14 +76,16 @@ describe('Notices (e2e)', () => {
 
       // 다른 관리자가 같은 날 공지를 추가로 올렸을 수도 있으므로,
       // "내가 만든 공지"가 아니라 "오늘 범위에서 실제로 가장 최신인 공지"와 비교한다.
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(startOfDay);
-      endOfDay.setDate(endOfDay.getDate() + 1);
+      // 서버 TZ와 무관하게 한국 시간(KST) 기준 오늘 범위를 사용한다.
+      const koreaDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+      }).format(new Date());
+      const startOfDay = new Date(`${koreaDate}T00:00:00+09:00`);
+      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
       const latestOfToday = await noticeRepository.findOne({
         where: { created_at: Between(startOfDay, endOfDay) },
-        order: { created_at: 'DESC' },
+        order: { created_at: 'DESC', id: 'DESC' },
       });
 
       expect(res.body).toMatchObject({ id: latestOfToday?.id });
