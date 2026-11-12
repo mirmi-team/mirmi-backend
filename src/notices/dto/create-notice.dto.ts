@@ -1,6 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { isOptionalChain } from 'typescript';
 
 export class CreateNoticeDto {
   @ApiProperty({ example: '오늘 저녁 점호 공지' })
@@ -14,9 +13,4 @@ export class CreateNoticeDto {
   @IsString()
   @IsNotEmpty()
   description: string;
-
-  @ApiProperty({ example: 'https://....', required: false })
-  @IsOptional()
-  @IsString()
-  image_url?: string;
 }
