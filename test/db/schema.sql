@@ -101,7 +101,8 @@ CREATE TABLE suggestion (
   category suggestion_category NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_by INTEGER,
-  reply TEXT
+  reply TEXT,
+  replied_at TIMESTAMP
 );
 
 CREATE TABLE notices (
