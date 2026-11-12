@@ -85,6 +85,20 @@ export class NoticesService {
     return notices;
   }
 
+  async findAllForAdmin(page: number, limit: number) {
+    // 관리자용: 전체 기간, 최신순 페이지네이션
+    const [items, total] = await this.noticeRepository.findAndCount({
+      order: {
+        created_at: 'DESC',
+        id: 'DESC',
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { items, total, page, limit };
+  }
+
   async create(dto: CreateNoticeDto, file?: Express.Multer.File) {
     let image_url: string | null = null;
 
