@@ -19,17 +19,25 @@ export class NoticesService {
     private readonly supabaseService: SupabaseService,
   ) {}
 
+  // 한국 시간(KST) 기준 오늘 [00:00:00, 내일 00:00:00) 범위. 서버 TZ와 무관하다.
+  private getKstTodayRange() {
+    const koreaDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    const startOfDay = new Date(`${koreaDate}T00:00:00+09:00`);
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    return { startOfDay, endOfDay };
+  }
+
   async findOne() {
-    // 오늘 공지사항 최근 1개 조회
-    // 오늘 00:00:00..
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // 오늘(KST) 등록된 공지사항 중 최신 1개 조회
+    const { startOfDay, endOfDay } = this.getKstTodayRange();
 
-    // 내일 00:00:00 (오늘의 끝)
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setTime(endOfDay.getTime() + 24 * 60 * 60 * 1000);
-
-    // 오늘 등록된 공지사항 중 최신 1개 조회
     const notice = await this.noticeRepository.findOne({
       where: {
         created_at: Between(startOfDay, endOfDay),
@@ -50,22 +58,9 @@ export class NoticesService {
   }
 
   async findAll() {
-    // 한국 시간(KST) 기준 오늘 날짜
-    const koreaDate = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    // 오늘(KST) 등록된 공지사항 전체 조회
+    const { startOfDay, endOfDay } = this.getKstTodayRange();
 
-    // 한국 시간 기준 오늘 00:00:00
-    const startOfDay = new Date(`${koreaDate}T00:00:00+09:00`);
-
-    // 한국 시간 기준 내일 00:00:00
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setTime(endOfDay.getTime() + 24 * 60 * 60 * 1000);
-
-    // 오늘 등록된 공지사항 전체 조회
     const notices = await this.noticeRepository.find({
       where: {
         created_at: Between(startOfDay, endOfDay),
@@ -83,6 +78,20 @@ export class NoticesService {
     }
 
     return notices;
+  }
+
+  async findAllForAdmin(page: number, limit: number) {
+    // 관리자용: 전체 기간, 최신순 페이지네이션
+    const [items, total] = await this.noticeRepository.findAndCount({
+      order: {
+        created_at: 'DESC',
+        id: 'DESC',
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { items, total, page, limit };
   }
 
   async create(dto: CreateNoticeDto, file?: Express.Multer.File) {
