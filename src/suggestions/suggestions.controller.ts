@@ -17,6 +17,10 @@ import {
 import { SuggestionsService } from './suggestions.service';
 import { CreateSuggestionDto } from './dto/create-suggestion.dto';
 import { ReplySuggestionDto } from './dto/reply-suggestion.dto';
+import {
+  SuggestionDetailDto,
+  SuggestionListItemDto,
+} from './dto/suggestion-response.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -46,7 +50,11 @@ export class SuggestionsController {
 
   // 전체 목록 조회 - 학생은 본인 것만, 관리자는 전체
   @ApiOperation({ summary: '건의사항 목록 조회 (학생: 본인 것, 관리자: 전체)' })
-  @ApiResponse({ status: 200, description: '조회 성공' })
+  @ApiResponse({
+    status: 200,
+    description: '조회 성공 (author는 관리자 응답에만 포함)',
+    type: [SuggestionListItemDto],
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Get()
   @UseGuards(JwtAuthGuard)
@@ -56,8 +64,14 @@ export class SuggestionsController {
 
   // 상세 조회 - 학생은 본인 것만, 관리자는 전체
   @ApiOperation({ summary: '건의사항 상세 조회 (학생: 본인 것, 관리자: 전체)' })
-  @ApiResponse({ status: 200, description: '조회 성공' })
+  @ApiResponse({
+    status: 200,
+    description: '조회 성공 (author는 관리자 응답에만 포함)',
+    type: SuggestionDetailDto,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: '타인의 건의사항 (학생)' })
+  @ApiResponse({ status: 404, description: '건의사항 없음' })
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   findOne(@GetUser() user: AuthUser, @Param('id') id: string) {
