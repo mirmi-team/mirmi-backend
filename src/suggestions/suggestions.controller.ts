@@ -20,6 +20,7 @@ import { ReplySuggestionDto } from './dto/reply-suggestion.dto';
 import {
   SuggestionDetailDto,
   SuggestionListItemDto,
+  SuggestionReplyResultDto,
 } from './dto/suggestion-response.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -80,7 +81,12 @@ export class SuggestionsController {
 
   // 답변 등록/수정 - 관리자
   @ApiOperation({ summary: '건의사항 답변 등록/수정 (관리자)' })
-  @ApiResponse({ status: 200, description: '답변 등록/수정 성공' })
+  @ApiResponse({
+    status: 200,
+    description: '답변 등록/수정 성공 (replied_at은 현재 시각으로 갱신)',
+    type: SuggestionReplyResultDto,
+  })
+  @ApiResponse({ status: 404, description: '건의사항 없음' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @Patch('admin/:id/reply')

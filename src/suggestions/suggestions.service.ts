@@ -10,6 +10,7 @@ import { CreateSuggestionDto } from './dto/create-suggestion.dto';
 import { ReplySuggestionDto } from './dto/reply-suggestion.dto';
 import { User, UserRole } from 'src/users/entities/user.entity';
 import { Room } from 'src/rooms/entities/room.entity';
+import { localDateTimeTransformer } from 'src/common/transformers/local-datetime.transformer';
 import { SuggestionAuthorDto } from './dto/suggestion-response.dto';
 
 @Injectable()
@@ -168,9 +169,15 @@ export class SuggestionsService {
     }
 
     suggestion.reply = dto.reply;
+    // created_at과 같은 서버 로컬 시각 기준 문자열로 기록한다
+    suggestion.replied_at = localDateTimeTransformer.from(new Date()) as string;
     await this.suggestionRepository.save(suggestion);
 
-    return { id: suggestion.id, reply: suggestion.reply };
+    return {
+      id: suggestion.id,
+      reply: suggestion.reply,
+      replied_at: suggestion.replied_at,
+    };
   }
 
   // 삭제 (본인 or 관리자)
