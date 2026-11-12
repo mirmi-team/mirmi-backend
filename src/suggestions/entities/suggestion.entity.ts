@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   BeforeInsert,
 } from 'typeorm';
+import { localDateTimeTransformer } from 'src/common/transformers/local-datetime.transformer';
 
 export enum SuggestionCategory {
   FACILITY = 'FACILITY',
@@ -39,6 +40,13 @@ export class Suggestion {
 
   @Column('text', { nullable: true })
   reply: string | null;
+
+  @Column({
+    type: 'timestamp',
+    nullable: true,
+    transformer: localDateTimeTransformer,
+  })
+  replied_at: string | null;
 
   @CreateDateColumn()
   created_at: Date;
