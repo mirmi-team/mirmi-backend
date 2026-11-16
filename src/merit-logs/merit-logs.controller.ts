@@ -7,6 +7,7 @@ import {
   Patch,
   Body,
   Param,
+  ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -89,6 +90,19 @@ export class MeritLogsController {
   @Roles('ADMIN')
   setScore(@Param('userId') userId: string, @Body() dto: SetMeritScoreDto) {
     return this.meritLogsService.setScore(+userId, dto);
+  }
+
+  // 특정 학생 상벌점 내역 조회 (관리자)
+  @ApiOperation({ summary: '특정 학생 상벌점 내역 조회 (관리자)' })
+  @ApiResponse({ status: 200, description: '조회 성공 (최신순)' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: '사용자를 찾을 수 없음' })
+  @Get('admin/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  getUserLogs(@Param('userId', ParseIntPipe) userId: number) {
+    return this.meritLogsService.getUserLogs(userId);
   }
 
   // 내 상벌점 내역 조회 (사용자)
