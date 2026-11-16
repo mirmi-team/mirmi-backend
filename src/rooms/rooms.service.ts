@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Room } from './entities/room.entity';
+import { RoomWithStudentsResponseDto } from './dto/room-with-students-response.dto';
 import { User, UserRole } from 'src/users/entities/user.entity';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
@@ -29,7 +30,9 @@ export class RoomsService {
    * 호실별 학생 목록 (관리자용). 한 번의 조인 쿼리로 조회한다.
    * role 조건은 WHERE가 아닌 LEFT JOIN의 ON에 두어 학생이 없는 호실도 포함한다.
    */
-  async findAllWithStudents(floor?: number) {
+  async findAllWithStudents(
+    floor?: number,
+  ): Promise<RoomWithStudentsResponseDto[]> {
     const qb = this.roomRepository
       .createQueryBuilder('r')
       .leftJoin(User, 'u', 'u.room_id = r.id AND u.role = :role', {
@@ -59,22 +62,7 @@ export class RoomsService {
       .getRawMany<RoomStudentRow>();
 
     // 행이 호실 순으로 정렬돼 있으므로 호실별로 묶는다.
-    const rooms = new Map<
-      number,
-      {
-        room_id: number;
-        room_number: number;
-        floor: number | null;
-        students: {
-          id: number;
-          username: string;
-          grade: number | null;
-          class_no: number | null;
-          total_merit_score: number;
-          profile_image: string | null;
-        }[];
-      }
-    >();
+    const rooms = new Map<number, RoomWithStudentsResponseDto>();
     for (const row of rows) {
       let room = rooms.get(row.room_id);
       if (!room) {
