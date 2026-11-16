@@ -90,6 +90,19 @@ export class MeritLogsService {
 
   // 내 상벌점 내역 조회 (사용자)
   async getMyLogs(userId: number) {
+    return await this.findLogsByUserId(userId);
+  }
+
+  // 특정 학생의 상벌점 내역 조회 (관리자)
+  async getUserLogs(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    return await this.findLogsByUserId(userId);
+  }
+
+  // 상벌점 내역 공통 조회 (최신순)
+  private async findLogsByUserId(userId: number) {
     return await this.meritLogRepository.find({
       where: { user_id: userId },
       order: { created_at: 'DESC' },
