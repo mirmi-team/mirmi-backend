@@ -1,7 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
+import { FindRoomsAdminQueryDto } from './dto/find-rooms-admin-query.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -19,6 +30,14 @@ export class RoomsController {
   @Get()
   findAll() {
     return this.roomsService.findAll();
+  }
+
+  // 'admin'이 :id로 해석되지 않도록 반드시 GET :id보다 위에 선언한다.
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  findAllWithStudents(@Query() query: FindRoomsAdminQueryDto) {
+    return this.roomsService.findAllWithStudents(query.floor);
   }
 
   @Get(':id')
