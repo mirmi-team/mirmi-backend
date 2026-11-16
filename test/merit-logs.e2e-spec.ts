@@ -10,7 +10,10 @@ import {
   createTestApp,
   login,
 } from './utils/e2e-setup';
-import { MeritLog } from '../src/merit-logs/entities/merit-log.entity';
+import {
+  MeritLog,
+  MeritType,
+} from '../src/merit-logs/entities/merit-log.entity';
 import { MeritReason } from '../src/merit-logs/entities/merit-reason.entity';
 import { User } from '../src/users/entities/user.entity';
 
@@ -23,11 +26,13 @@ describe('MeritLogs (e2e)', () => {
   let studentToken: string;
   let studentUserId: number;
   let adminToken: string;
+  let adminUserId: number;
 
   let originalTotalMeritScore: number;
   let createdReasonId: number;
   let createdLogId: number;
   let penaltyLogId: number;
+  const extraLogIds: number[] = [];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -43,8 +48,13 @@ describe('MeritLogs (e2e)', () => {
     studentToken = studentLogin.accessToken;
     studentUserId = studentLogin.userId;
 
-    adminToken = (await login(app, ADMIN_ACCOUNT.email, ADMIN_ACCOUNT.password))
-      .accessToken;
+    const adminLogin = await login(
+      app,
+      ADMIN_ACCOUNT.email,
+      ADMIN_ACCOUNT.password,
+    );
+    adminToken = adminLogin.accessToken;
+    adminUserId = adminLogin.userId;
 
     const student = await userRepository.findOne({
       where: { id: studentUserId },
@@ -58,6 +68,9 @@ describe('MeritLogs (e2e)', () => {
     }
     if (penaltyLogId) {
       await meritLogRepository.delete(penaltyLogId);
+    }
+    if (extraLogIds.length) {
+      await meritLogRepository.delete(extraLogIds);
     }
     if (createdReasonId) {
       await meritReasonRepository.delete(createdReasonId);
@@ -214,6 +227,102 @@ describe('MeritLogs (e2e)', () => {
       expect(
         res.body.some((log: { id: number }) => log.id === createdLogId),
       ).toBe(true);
+    });
+  });
+
+  describe('GET /merit-logs/admin/:userId', () => {
+    const url = (id: number | string) => `/merit-logs/admin/${id}`;
+    let olderLogId: number;
+    let newerLogId: number;
+    let adminLogId: number;
+
+    beforeAll(async () => {
+      // created_at이 @BeforeInsert로 덮어써지므로 저장 후 시각을 직접 지정한다.
+      const make = async (userId: number, createdAt: string) => {
+        const log = await meritLogRepository.save(
+          meritLogRepository.create({
+            user_id: userId,
+            type: MeritType.REWARD,
+            score: 1,
+            reason: 'E2E 관리자 조회 테스트',
+          }),
+        );
+        await meritLogRepository.update(log.id, {
+          created_at: new Date(createdAt),
+        });
+        extraLogIds.push(log.id);
+        return log.id;
+      };
+      olderLogId = await make(studentUserId, '2098-01-01T00:00:00Z');
+      newerLogId = await make(studentUserId, '2099-01-01T00:00:00Z');
+      adminLogId = await make(adminUserId, '2099-06-01T00:00:00Z');
+    });
+
+    it('토큰 없이 요청하면 401을 반환한다', async () => {
+      const res = await request(app.getHttpServer()).get(url(studentUserId));
+      expect(res.status).toBe(401);
+    });
+
+    it('학생 토큰이면 403을 반환한다', async () => {
+      const res = await request(app.getHttpServer())
+        .get(url(studentUserId))
+        .set(authHeader(studentToken));
+      expect(res.status).toBe(403);
+    });
+
+    it('존재하지 않는 userId면 404를 반환한다', async () => {
+      const res = await request(app.getHttpServer())
+        .get(url(999999999))
+        .set(authHeader(adminToken));
+      expect(res.status).toBe(404);
+      expect((res.body as { message: string }).message).toBe(
+        '사용자를 찾을 수 없습니다.',
+      );
+    });
+
+    it('userId가 숫자가 아니면 400을 반환한다', async () => {
+      const res = await request(app.getHttpServer())
+        .get(url('abc'))
+        .set(authHeader(adminToken));
+      expect(res.status).toBe(400);
+    });
+
+    it('관리자가 학생의 내역을 최신순으로 조회한다', async () => {
+      const res = await request(app.getHttpServer())
+        .get(url(studentUserId))
+        .set(authHeader(adminToken));
+
+      expect(res.status).toBe(200);
+      const logs = res.body as { id: number; created_at: string }[];
+      const ids = logs.map((l) => l.id);
+      expect(ids.indexOf(newerLogId)).toBeGreaterThanOrEqual(0);
+      expect(ids.indexOf(newerLogId)).toBeLessThan(ids.indexOf(olderLogId));
+
+      const times = logs.map((l) => new Date(l.created_at).getTime());
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+    });
+
+    it('해당 학생의 내역만 반환하고 /me와 같은 형태다', async () => {
+      const res = await request(app.getHttpServer())
+        .get(url(studentUserId))
+        .set(authHeader(adminToken));
+      const logs = res.body as { id: number; user_id: number }[];
+
+      expect(logs.every((l) => l.user_id === studentUserId)).toBe(true);
+      expect(logs.map((l) => l.id)).not.toContain(adminLogId);
+
+      const me = await request(app.getHttpServer())
+        .get('/merit-logs/me')
+        .set(authHeader(studentToken));
+      expect(res.body).toEqual(me.body);
+
+      // 다른 사용자(관리자 계정)를 조회하면 그 사용자의 내역만 나온다.
+      const adminRes = await request(app.getHttpServer())
+        .get(url(adminUserId))
+        .set(authHeader(adminToken));
+      const adminLogs = adminRes.body as { id: number; user_id: number }[];
+      expect(adminLogs.map((l) => l.id)).toContain(adminLogId);
+      expect(adminLogs.every((l) => l.user_id === adminUserId)).toBe(true);
     });
   });
 
