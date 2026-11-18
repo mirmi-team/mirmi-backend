@@ -10,6 +10,7 @@ import {
   CreateReturnRequestDto,
   ReturnType,
 } from './dto/create-return-request.dto';
+import { nowKstDateTime } from 'src/common/transformers/local-datetime.transformer';
 import { VerifyReturnDto } from './dto/verify-return.dto';
 
 const QR_TOKEN_TTL_MS = 30 * 1000; // 30초
@@ -254,14 +255,14 @@ export class ReturnRequestsService {
 
     if (existing) {
       await this.returnRepo.update(existing.id, {
-        actual_return_time: new Date().toISOString(),
+        actual_return_time: nowKstDateTime(),
       });
     } else {
       await this.returnRepo.save(
         this.returnRepo.create({
           user_id: userId,
           request_date: today(),
-          actual_return_time: new Date().toISOString(),
+          actual_return_time: nowKstDateTime(),
           return_type: returnType,
         }),
       );

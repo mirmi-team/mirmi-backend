@@ -252,9 +252,14 @@ describe('Suggestions (e2e)', () => {
         id: createdSuggestionId,
         reply: 'E2E 테스트 답변입니다.',
         replied_at: expect.stringMatching(
-          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+          /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?\+09:00$/,
         ) as string,
       });
+      // KST 오프셋이 붙은 값이 실제 지금 시각을 가리키는지 (UTC 값이 잘못 저장되면 9시간 어긋난다)
+      const repliedAt = (res.body as { replied_at: string }).replied_at;
+      expect(Math.abs(Date.parse(repliedAt) - Date.now())).toBeLessThan(
+        60 * 1000,
+      );
     });
 
     it('답변 후 조회하면 replied_at이 채워져 있다', async () => {
