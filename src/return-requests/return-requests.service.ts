@@ -73,7 +73,7 @@ function toKst(date: Date): {
 
 // 입실 체크된 "시:분"(한국시간 기준)이 어느 복귀 타입 시간대에 해당하는지 판단.
 // 어느 시간대에도 안 걸치면 null (타입 없이 저장).
-function resolveReturnTypeByTime(date: Date): ReturnType | null {
+export function resolveReturnTypeByTime(date: Date): ReturnType | null {
   const { hours, minutes } = toKst(date);
   const nowMinutes = hours * 60 + minutes;
   const inRange = (
@@ -84,12 +84,13 @@ function resolveReturnTypeByTime(date: Date): ReturnType | null {
   ) => {
     const start = startH * 60 + startM;
     const end = endH * 60 + endM;
-    return nowMinutes >= start && nowMinutes <= end;
+    // 끝 시각은 제외한다. (17:20은 바로복귀가 아니라 석식, 18:20은 석식이 아니라 8시복귀)
+    return nowMinutes >= start && nowMinutes < end;
   };
 
-  if (inRange(8, 0, 16, 30)) return ReturnType.IMMEDIATE; // 바로 복귀 08:00~16:30
+  if (inRange(8, 0, 17, 20)) return ReturnType.IMMEDIATE; // 바로 복귀 08:00~17:20
   if (inRange(17, 20, 18, 20)) return ReturnType.DINNER; // 석식 복귀 17:20~18:20
-  if (inRange(18, 20, 20, 30)) return ReturnType.EIGHT_PM; // 8시 복귀 18:20~20:30
+  if (inRange(18, 20, 20, 31)) return ReturnType.EIGHT_PM; // 8시 복귀 18:20~20:30 (20:30 포함)
   return null;
 }
 

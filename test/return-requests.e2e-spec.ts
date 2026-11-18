@@ -10,6 +10,8 @@ import {
   createTestApp,
   login,
 } from './utils/e2e-setup';
+import { resolveReturnTypeByTime } from '../src/return-requests/return-requests.service';
+import { ReturnType } from '../src/return-requests/dto/create-return-request.dto';
 import { Room } from '../src/rooms/entities/room.entity';
 import { ReturnRequest } from '../src/return-requests/entities/return-request.entity';
 import { User, UserRole } from '../src/users/entities/user.entity';
@@ -125,5 +127,26 @@ describe('Return requests admin (e2e)', () => {
       );
       expect(Math.abs(Date.parse(time) - Date.now())).toBeLessThan(60 * 1000);
     });
+  });
+});
+
+describe('resolveReturnTypeByTime', () => {
+  // 서버 TZ와 무관하게 KST 시각으로 만든 순간
+  const at = (hhmm: string) => new Date(`2026-05-14T${hhmm}:00+09:00`);
+
+  it.each([
+    ['07:59', null],
+    ['08:00', ReturnType.IMMEDIATE],
+    ['16:29', ReturnType.IMMEDIATE],
+    ['16:30', ReturnType.IMMEDIATE], // 예전에는 16:31~17:19가 공백이었다
+    ['16:31', ReturnType.IMMEDIATE],
+    ['17:19', ReturnType.IMMEDIATE],
+    ['17:20', ReturnType.DINNER],
+    ['18:19', ReturnType.DINNER],
+    ['18:20', ReturnType.EIGHT_PM],
+    ['20:30', ReturnType.EIGHT_PM],
+    ['20:31', null],
+  ])('%s → %s', (time, expected) => {
+    expect(resolveReturnTypeByTime(at(time))).toBe(expected);
   });
 });
