@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
+import { User, UserRole } from 'src/users/entities/user.entity';
 import { ReturnRequest } from './entities/return-request.entity';
 import { createHmac, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
@@ -289,7 +289,9 @@ export class ReturnRequestsService {
   // GET /admin/returns/today?floor=5 - 오늘 전체 학생 복귀 현황을 층별로 조회.
   // floor를 안 주면 전체 층을 다 보여줍니다.
   async getTodayStatusByFloor(floor?: number): Promise<FloorReturnStatus[]> {
+    // 관리자는 방이 배정돼 있어도 복귀 대상이 아니므로 학생만 조회한다.
     const students = await this.userRepo.find({
+      where: { role: UserRole.STUDENT },
       relations: { room: true },
       order: { room: { room_number: 'ASC' } },
     });
