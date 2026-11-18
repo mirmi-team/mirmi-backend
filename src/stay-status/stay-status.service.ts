@@ -80,15 +80,15 @@ export class StayStatusService {
     const submitted = records.map((record) => {
       const user = userMap.get(record.user_id);
       return {
-        id: record.id as number | null,
+        id: record.id,
         user_id: record.user_id,
         username: user?.username ?? null,
         room_number: user?.room?.room_number ?? null,
-        status: record.status as StayStatusType | null,
+        status: record.status,
         // 사감이 잔류 학생 보호자에게 연락할 수 있어야 한다.
-        parent_phone: record.parent_phone as string | null,
+        parent_phone: record.parent_phone,
         week_start: record.week_start,
-        updated_at: record.updated_at as Date | null,
+        updated_at: record.updated_at,
       };
     });
 
