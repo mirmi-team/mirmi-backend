@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { StayStatus, StayStatusType } from './entities/stay-status.entity';
 import { CreateStayStatusDto } from './dto/create-stay-status.dto';
-import { User } from 'src/users/entities/user.entity';
+import { User, UserRole } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class StayStatusService {
@@ -77,7 +77,7 @@ export class StayStatusService {
       : [];
     const userMap = new Map(users.map((user) => [user.id, user]));
 
-    const list = records.map((record) => {
+    const submitted = records.map((record) => {
       const user = userMap.get(record.user_id);
       return {
         id: record.id,
@@ -92,12 +92,42 @@ export class StayStatusService {
       };
     });
 
+    // 잔류 신청 대상(학생 + can_staying)인데 이번 주에 아직 신청하지 않은 학생.
+    // 방 미배정 학생도 room_number null로 포함한다.
+    const submittedUserIds = new Set(userIds);
+    const targets = await this.userRepository.find({
+      where: { role: UserRole.STUDENT, can_staying: true },
+      relations: { room: true },
+    });
+    const notSubmitted = targets
+      .filter((user) => !submittedUserIds.has(user.id))
+      .sort((a, b) => {
+        const roomA = a.room?.room_number ?? Number.MAX_SAFE_INTEGER;
+        const roomB = b.room?.room_number ?? Number.MAX_SAFE_INTEGER;
+        return roomA - roomB || a.id - b.id;
+      })
+      .map((user) => ({
+        id: null,
+        user_id: user.id,
+        username: user.username,
+        room_number: user.room?.room_number ?? null,
+        status: null,
+        parent_phone: null,
+        week_start: week,
+        updated_at: null,
+      }));
+
+    // 신청 학생이 먼저, 미신청 학생은 방 번호순으로 뒤에 붙인다.
+    const list: ((typeof submitted)[number] | (typeof notSubmitted)[number])[] =
+      [...submitted, ...notSubmitted];
+
     const summary = {
       STAY: records.filter((record) => record.status === StayStatusType.STAY)
         .length,
       OUTING: records.filter(
         (record) => record.status === StayStatusType.OUTING,
       ).length,
+      NOT_SUBMITTED: notSubmitted.length,
     };
 
     return { week_start: week, summary, list };

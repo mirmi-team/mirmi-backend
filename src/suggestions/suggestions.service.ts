@@ -10,7 +10,7 @@ import { CreateSuggestionDto } from './dto/create-suggestion.dto';
 import { ReplySuggestionDto } from './dto/reply-suggestion.dto';
 import { User, UserRole } from 'src/users/entities/user.entity';
 import { Room } from 'src/rooms/entities/room.entity';
-import { localDateTimeTransformer } from 'src/common/transformers/local-datetime.transformer';
+import { nowKstDateTime } from 'src/common/transformers/local-datetime.transformer';
 import { SuggestionAuthorDto } from './dto/suggestion-response.dto';
 
 @Injectable()
@@ -169,8 +169,8 @@ export class SuggestionsService {
     }
 
     suggestion.reply = dto.reply;
-    // created_at과 같은 서버 로컬 시각 기준 문자열로 기록한다
-    suggestion.replied_at = localDateTimeTransformer.from(new Date()) as string;
+    // KST 시각으로 기록한다. (저장 시 트랜스포머가 오프셋을 떼고 KST 벽시계 값으로 넣는다)
+    suggestion.replied_at = nowKstDateTime();
     await this.suggestionRepository.save(suggestion);
 
     return {

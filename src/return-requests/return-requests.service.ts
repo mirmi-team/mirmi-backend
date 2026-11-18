@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
+import { User, UserRole } from 'src/users/entities/user.entity';
 import { ReturnRequest } from './entities/return-request.entity';
 import { createHmac, timingSafeEqual } from 'crypto';
 import * as QRCode from 'qrcode';
@@ -10,6 +10,7 @@ import {
   CreateReturnRequestDto,
   ReturnType,
 } from './dto/create-return-request.dto';
+import { nowKstDateTime } from 'src/common/transformers/local-datetime.transformer';
 import { VerifyReturnDto } from './dto/verify-return.dto';
 
 const QR_TOKEN_TTL_MS = 30 * 1000; // 30초
@@ -72,7 +73,7 @@ function toKst(date: Date): {
 
 // 입실 체크된 "시:분"(한국시간 기준)이 어느 복귀 타입 시간대에 해당하는지 판단.
 // 어느 시간대에도 안 걸치면 null (타입 없이 저장).
-function resolveReturnTypeByTime(date: Date): ReturnType | null {
+export function resolveReturnTypeByTime(date: Date): ReturnType | null {
   const { hours, minutes } = toKst(date);
   const nowMinutes = hours * 60 + minutes;
   const inRange = (
@@ -83,12 +84,13 @@ function resolveReturnTypeByTime(date: Date): ReturnType | null {
   ) => {
     const start = startH * 60 + startM;
     const end = endH * 60 + endM;
-    return nowMinutes >= start && nowMinutes <= end;
+    // 끝 시각은 제외한다. (17:20은 바로복귀가 아니라 석식, 18:20은 석식이 아니라 8시복귀)
+    return nowMinutes >= start && nowMinutes < end;
   };
 
-  if (inRange(8, 0, 16, 30)) return ReturnType.IMMEDIATE; // 바로 복귀 08:00~16:30
+  if (inRange(8, 0, 17, 20)) return ReturnType.IMMEDIATE; // 바로 복귀 08:00~17:20
   if (inRange(17, 20, 18, 20)) return ReturnType.DINNER; // 석식 복귀 17:20~18:20
-  if (inRange(18, 20, 20, 30)) return ReturnType.EIGHT_PM; // 8시 복귀 18:20~20:30
+  if (inRange(18, 20, 20, 31)) return ReturnType.EIGHT_PM; // 8시 복귀 18:20~20:30 (20:30 포함)
   return null;
 }
 
@@ -254,14 +256,14 @@ export class ReturnRequestsService {
 
     if (existing) {
       await this.returnRepo.update(existing.id, {
-        actual_return_time: new Date().toISOString(),
+        actual_return_time: nowKstDateTime(),
       });
     } else {
       await this.returnRepo.save(
         this.returnRepo.create({
           user_id: userId,
           request_date: today(),
-          actual_return_time: new Date().toISOString(),
+          actual_return_time: nowKstDateTime(),
           return_type: returnType,
         }),
       );
@@ -289,7 +291,9 @@ export class ReturnRequestsService {
   // GET /admin/returns/today?floor=5 - 오늘 전체 학생 복귀 현황을 층별로 조회.
   // floor를 안 주면 전체 층을 다 보여줍니다.
   async getTodayStatusByFloor(floor?: number): Promise<FloorReturnStatus[]> {
+    // 관리자는 방이 배정돼 있어도 복귀 대상이 아니므로 학생만 조회한다.
     const students = await this.userRepo.find({
+      where: { role: UserRole.STUDENT },
       relations: { room: true },
       order: { room: { room_number: 'ASC' } },
     });
